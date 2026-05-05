@@ -43,28 +43,48 @@ def upsert(
     rows: Sequence[dict[str, Any]],
     conflict_cols: Sequence[str],
 ) -> int:
-    """Upsert rows into table, returning the number of rows submitted.
+    """Upsert rows into ``table`` using DuckDB's bulk DataFrame ingestion.
 
-    Uses DuckDB's INSERT … ON CONFLICT DO UPDATE. All non-key columns are overwritten.
+    Builds a pandas DataFrame, registers it as a view, and runs a single
+    ``INSERT … SELECT … ON CONFLICT DO UPDATE``. This is dramatically faster
+    than ``executemany`` for non-trivial batches (typically 10–100×).
     """
     if not rows:
         return 0
+    import pandas as pd  # local import keeps import cost off the hot path until needed
+
     cols = list(rows[0].keys())
-    placeholders = ", ".join(["?"] * len(cols))
+    df = pd.DataFrame(rows, columns=cols)
+
     update_cols = [c for c in cols if c not in conflict_cols]
-    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols) or None
+    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
     conflict = ", ".join(conflict_cols)
+    select_list = ", ".join(cols)
+
     if set_clause:
         sql = (
-            f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders}) "
+            f"INSERT INTO {table} ({select_list}) "
+            f"SELECT {select_list} FROM _gb_staging "
             f"ON CONFLICT ({conflict}) DO UPDATE SET {set_clause}"
         )
     else:
         sql = (
-            f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders}) "
+            f"INSERT INTO {table} ({select_list}) "
+            f"SELECT {select_list} FROM _gb_staging "
             f"ON CONFLICT ({conflict}) DO NOTHING"
         )
-    conn.executemany(sql, [[r.get(c) for c in cols] for r in rows])
+
+    conn.register("_gb_staging", df)
+    try:
+        conn.execute("BEGIN")
+        try:
+            conn.execute(sql)
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.unregister("_gb_staging")
     return len(rows)
 
 

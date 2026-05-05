@@ -19,6 +19,15 @@
             just
             ruff
             sqlite-utils
+            stdenv.cc.cc.lib   # libstdc++.so.6 for prebuilt wheels (pyzmq, etc.)
+            zlib
+          ];
+
+          # uv installs prebuilt manylinux wheels that dlopen against glibc-style
+          # paths. On NixOS we must point them at the Nix-provided libs.
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
           ];
 
           shellHook = ''

@@ -15,6 +15,8 @@ from .ingest import DATASETS
 from .ingest.b1610 import ingest_b1610
 from .ingest.boalf import ingest_boalf
 from .ingest.fuelinst import ingest_fuelinst
+from .ingest.mels import ingest_mels
+from .ingest.pn import ingest_pn
 from .ingest.system_prices import ingest_system_prices
 
 structlog.configure(
@@ -63,6 +65,10 @@ def backfill(
                     ingest_boalf(conn, client, start_dt, end_dt)
                 elif d == "b1610":
                     ingest_b1610(conn, client, start_d, end_d)
+                elif d == "pn":
+                    ingest_pn(conn, client, start_dt, end_dt)
+                elif d == "mels":
+                    ingest_mels(conn, client, start_dt, end_dt)
                 elif d == "system_prices":
                     ingest_system_prices(conn, client, start_d, end_d)
     finally:
@@ -87,6 +93,8 @@ def status() -> None:
             table_stats(conn, "fuelinst", "publish_time"),
             table_stats(conn, "b1610", "settlement_date"),
             table_stats(conn, "boalf", "time_from"),
+            table_stats(conn, "pn", "time_from"),
+            table_stats(conn, "mels", "time_from"),
             table_stats(conn, "system_prices", "settlement_date"),
         ]
         wm = conn.execute(

@@ -22,7 +22,7 @@ def test_extract_data_handles_list_and_dict():
 def test_fetch_fuelinst_shapes_rows(httpx_mock, client):
     httpx_mock.add_response(
         url=httpx.URL(
-            "https://example.test/datasets/FUELINST",
+            "https://example.test/datasets/FUELINST/stream",
             params={
                 "publishDateTimeFrom": "2026-05-01T00:00:00Z",
                 "publishDateTimeTo": "2026-05-01T01:00:00Z",

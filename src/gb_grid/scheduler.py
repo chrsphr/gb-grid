@@ -11,6 +11,8 @@ from .db import connect, get_watermark
 from .ingest.b1610 import ingest_b1610
 from .ingest.boalf import ingest_boalf
 from .ingest.fuelinst import ingest_fuelinst
+from .ingest.mels import ingest_mels
+from .ingest.pn import ingest_pn
 from .ingest.system_prices import ingest_system_prices
 
 log = structlog.get_logger(__name__)
@@ -62,6 +64,28 @@ def _b1610_tick() -> None:
         conn.close()
 
 
+def _pn_tick() -> None:
+    conn = connect()
+    try:
+        with BMRSClient() as client:
+            now = _utcnow()
+            start = now - timedelta(hours=4)
+            ingest_pn(conn, client, start, now + timedelta(hours=24))
+    finally:
+        conn.close()
+
+
+def _mels_tick() -> None:
+    conn = connect()
+    try:
+        with BMRSClient() as client:
+            now = _utcnow()
+            start = now - timedelta(hours=4)
+            ingest_mels(conn, client, start, now + timedelta(hours=24))
+    finally:
+        conn.close()
+
+
 def _system_prices_tick() -> None:
     conn = connect()
     try:
@@ -78,5 +102,7 @@ async def run_scheduler() -> None:
         _loop("fuelinst", POLL.fuelinst_seconds, _fuelinst_tick),
         _loop("boalf", POLL.boalf_seconds, _boalf_tick),
         _loop("b1610", POLL.b1610_seconds, _b1610_tick),
+        _loop("pn", POLL.pn_seconds, _pn_tick),
+        _loop("mels", POLL.mels_seconds, _mels_tick),
         _loop("system_prices", POLL.system_prices_seconds, _system_prices_tick),
     )

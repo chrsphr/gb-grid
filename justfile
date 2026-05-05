@@ -23,3 +23,6 @@ test:
 
 lint:
     ruff check src tests
+
+kernel:
+    ./scripts/register-kernel.sh

@@ -19,6 +19,8 @@ class PollConfig:
     fuelinst_seconds: int = 300
     boalf_seconds: int = 300
     b1610_seconds: int = 1800
+    pn_seconds: int = 300
+    mels_seconds: int = 300
     system_prices_seconds: int = 3600
 
 
