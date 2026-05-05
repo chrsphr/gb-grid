@@ -21,49 +21,50 @@ import pandas as pd
 
 
 def _interp_segments(
-    df: pd.DataFrame, idx: pd.DatetimeIndex, value_from: str, value_to: str
+    df: pd.DataFrame,
+    idx: pd.DatetimeIndex,
+    value_from: str,
+    value_to: str,
+    order_cols: list[str] | None = None,
 ) -> pd.Series:
-    """Resample piecewise-linear segments [time_from, time_to] onto idx.
+    """Resample piecewise-linear segments ``[time_from, time_to)`` onto ``idx``.
 
-    df rows: time_from, time_to, <value_from>, <value_to>.
+    Where multiple segments overlap a given index point, the segment that comes
+    *later* in ``order_cols`` ascending order wins. For BOALF this is what we
+    want: a newer acceptance supersedes any still-running ramp from an older
+    one. ``order_cols`` defaults to ``["time_from"]`` (no overlap arbitration).
+
     Outside any segment -> NaN.
     """
+    import numpy as np
+
     if df.empty:
         return pd.Series(index=idx, dtype="float64")
-    df = df.sort_values("time_from").reset_index(drop=True)
-    out = pd.Series(index=idx, dtype="float64")
-    # Vectorised lookup: for each idx point find the segment whose [t_from, t_to) covers it.
+
+    sort_keys = order_cols or ["time_from"]
+    df = df.sort_values(sort_keys, kind="stable").reset_index(drop=True)
+
+    out = pd.Series(np.nan, index=idx, dtype="float64")
+    pts = idx.to_numpy("datetime64[ns]")
     t_from = df["time_from"].to_numpy("datetime64[ns]")
     t_to = df["time_to"].to_numpy("datetime64[ns]")
     v_from = df[value_from].to_numpy("float64")
     v_to = df[value_to].to_numpy("float64")
-    pts = idx.to_numpy("datetime64[ns]")
 
-    # Right-edge search: segment i covers pts where t_from[i] <= pt < t_to[i].
-    import numpy as np
+    # Stamp segments in ascending order so later ones overwrite earlier ones.
+    for i in range(len(df)):
+        mask = (pts >= t_from[i]) & (pts < t_to[i])
+        if not mask.any():
+            continue
+        span = (t_to[i] - t_from[i]).astype("timedelta64[ns]").astype("int64")
+        if span <= 0:
+            vals = v_from[i]
+        else:
+            offset = (pts[mask] - t_from[i]).astype("timedelta64[ns]").astype("int64")
+            frac = offset / span
+            vals = v_from[i] + (v_to[i] - v_from[i]) * frac
+        out.iloc[np.where(mask)[0]] = vals
 
-    seg = np.searchsorted(t_from, pts, side="right") - 1
-    valid = (seg >= 0) & (seg < len(df))
-    if not valid.any():
-        return out
-    seg_v = seg[valid]
-    pts_v = pts[valid]
-    in_seg = pts_v < t_to[seg_v]
-    seg_v = seg_v[in_seg]
-    pts_v = pts_v[in_seg]
-    if len(pts_v) == 0:
-        return out
-
-    span = (t_to[seg_v] - t_from[seg_v]).astype("timedelta64[ns]").astype("int64")
-    offset = (pts_v - t_from[seg_v]).astype("timedelta64[ns]").astype("int64")
-    # Avoid div-by-zero: where span == 0, value_from applies.
-    with np.errstate(divide="ignore", invalid="ignore"):
-        frac = np.where(span > 0, offset / span, 0.0)
-    vals = v_from[seg_v] + (v_to[seg_v] - v_from[seg_v]) * frac
-
-    pos_mask = np.zeros(len(pts), dtype=bool)
-    pos_mask[np.where(valid)[0][in_seg]] = True
-    out.iloc[pos_mask] = vals
     return out
 
 
@@ -93,8 +94,8 @@ def _fetch_boalf(
     # BOALF stores ngc_bm_unit; B1610 fills it via nationalGridBmUnitId. Either column.
     return conn.execute(
         """
-        SELECT bm_unit, ngc_bm_unit, acceptance_id, time_from, time_to,
-               level_from, level_to, so_flag
+        SELECT bm_unit, ngc_bm_unit, acceptance_id, acceptance_time,
+               time_from, time_to, level_from, level_to, so_flag
         FROM boalf
         WHERE (ngc_bm_unit = ANY(?) OR bm_unit = ANY(?))
           AND time_to >= ? AND time_from < ?
@@ -166,12 +167,16 @@ def bmu_dispatch(
         ]
 
         pn_series = _interp_segments(pn_u, idx, "level_from", "level_to")
-        boa_all = _interp_segments(boa_u, idx, "level_from", "level_to")
+        boa_order = ["acceptance_time", "time_from"]
+        boa_all = _interp_segments(
+            boa_u, idx, "level_from", "level_to", order_cols=boa_order
+        )
         boa_so = _interp_segments(
             boa_u[boa_u["so_flag"] == True],  # noqa: E712
             idx,
             "level_from",
             "level_to",
+            order_cols=boa_order,
         )
 
         # Where no acceptance is active, dispatched level == FPN.
