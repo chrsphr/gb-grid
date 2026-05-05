@@ -9,6 +9,9 @@ Definitions used here:
 - ``boa_curtailment_mw``   max(pn_mw - boa_level_mw, 0). Any acceptance taking unit DOWN.
 - ``so_curtailment_mw``    same as ``boa_curtailment_mw`` but only for SO-flagged
                            acceptances (``so_flag = TRUE``).
+- ``mel_mw``               Maximum Export Level — physical cap. ``pn_mw`` and
+                           ``boa_level_mw`` are both clipped to MEL where MEL is
+                           known, since a unit cannot physically exceed it.
 """
 
 from __future__ import annotations
@@ -104,6 +107,24 @@ def _fetch_boalf(
     ).df()
 
 
+def _fetch_mels(
+    conn: duckdb.DuckDBPyConnection,
+    ngc_units: list[str],
+    start: datetime,
+    end: datetime,
+) -> pd.DataFrame:
+    return conn.execute(
+        """
+        SELECT national_grid_bm_unit, notification_sequence,
+               time_from, time_to, level_from, level_to
+        FROM mels
+        WHERE national_grid_bm_unit = ANY(?)
+          AND time_to >= ? AND time_from < ?
+        """,
+        [ngc_units, start, end],
+    ).df()
+
+
 def fetch_b1610(
     conn: duckdb.DuckDBPyConnection,
     ngc_units: Iterable[str],
@@ -153,6 +174,7 @@ def bmu_dispatch(
     units = list(ngc_units)
     pn = _fetch_pn(conn, units, start, end)
     boa = _fetch_boalf(conn, units, start, end)
+    mel = _fetch_mels(conn, units, start, end)
 
     idx = pd.date_range(start=start, end=end, freq=freq, inclusive="left")
     frames: list[pd.DataFrame] = []
@@ -166,7 +188,7 @@ def bmu_dispatch(
             | (boa["bm_unit"] == f"T_{unit}")
         ]
 
-        pn_series = _interp_segments(pn_u, idx, "level_from", "level_to")
+        pn_raw = _interp_segments(pn_u, idx, "level_from", "level_to")
         boa_order = ["acceptance_time", "time_from"]
         boa_all = _interp_segments(
             boa_u, idx, "level_from", "level_to", order_cols=boa_order
@@ -178,12 +200,26 @@ def bmu_dispatch(
             "level_to",
             order_cols=boa_order,
         )
+        mel_u = mel[mel["national_grid_bm_unit"] == unit]
+        mel_series = _interp_segments(
+            mel_u,
+            idx,
+            "level_from",
+            "level_to",
+            order_cols=["notification_sequence", "time_from"],
+        )
 
-        # Where no acceptance is active, dispatched level == FPN.
-        boa_level = boa_all.where(boa_all.notna(), pn_series)
+        # MEL is a physical cap — a unit cannot exceed it. Apply to PN and BOA.
+        # Where MEL is unknown, leave the value uncapped.
+        pn_series = pn_raw.where(mel_series.isna(), pn_raw.clip(upper=mel_series))
+        boa_capped = boa_all.where(mel_series.isna(), boa_all.clip(upper=mel_series))
+        boa_so_capped = boa_so.where(mel_series.isna(), boa_so.clip(upper=mel_series))
+
+        # Where no acceptance is active, dispatched level == FPN (already MEL-capped).
+        boa_level = boa_capped.where(boa_capped.notna(), pn_series)
 
         delta = boa_level - pn_series
-        so_delta = boa_so - pn_series
+        so_delta = boa_so_capped - pn_series
 
         df = pd.DataFrame(
             {
@@ -191,6 +227,7 @@ def bmu_dispatch(
                 "ngc_bm_unit": unit,
                 "pn_mw": pn_series.values,
                 "boa_level_mw": boa_level.values,
+                "mel_mw": mel_series.values,
                 "so_turnup_mw": delta.clip(lower=0).values,
                 "boa_curtailment_mw": (-delta).clip(lower=0).values,
                 "so_curtailment_mw": (-so_delta).clip(lower=0).fillna(0).values,
