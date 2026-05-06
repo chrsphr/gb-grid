@@ -10,7 +10,34 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        python = pkgs.python313;
+
+        gb-grid = python.pkgs.buildPythonApplication {
+          pname = "gb-grid";
+          version = "0.1.0";
+          pyproject = true;
+          src = ./.;
+
+          build-system = with python.pkgs; [ hatchling ];
+
+          dependencies = with python.pkgs; [
+            httpx
+            tenacity
+            duckdb
+            pandas
+            pydantic
+            typer
+            structlog
+            python-dateutil
+          ];
+
+          # Tests rely on dev-only deps; skip in the package build.
+          doCheck = false;
+        };
       in {
+        packages.default = gb-grid;
+        packages.gb-grid = gb-grid;
+
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             python313
