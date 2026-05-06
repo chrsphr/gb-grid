@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from gb_grid.analytics import bmu_dispatch
-from gb_grid.db import connect, upsert
+from gb_grid.db import upsert
 
 
 def _seed(conn):
@@ -54,11 +54,10 @@ def _seed(conn):
     )
 
 
-def test_bmu_dispatch_curtailment_and_turnup():
-    conn = connect(":memory:")
-    _seed(conn)
+def test_bmu_dispatch_curtailment_and_turnup(db):
+    _seed(db)
     df = bmu_dispatch(
-        conn,
+        db,
         ["PEHE-1"],
         datetime(2026, 5, 1, 12, 0),
         datetime(2026, 5, 1, 13, 0),

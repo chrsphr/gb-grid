@@ -23,15 +23,15 @@
           dependencies = with python.pkgs; [
             httpx
             tenacity
-            duckdb
-            pandas
+            psycopg
+            psycopg-pool
+            yoyo-migrations
             pydantic
             typer
             structlog
             python-dateutil
           ];
 
-          # Tests rely on dev-only deps; skip in the package build.
           doCheck = false;
         };
       in {
@@ -42,10 +42,9 @@
           packages = with pkgs; [
             python313
             uv
-            duckdb
+            postgresql_16
             just
             ruff
-            sqlite-utils
             stdenv.cc.cc.lib   # libstdc++.so.6 for prebuilt wheels (pyzmq, etc.)
             zlib
           ];
@@ -60,11 +59,49 @@
           shellHook = ''
             export UV_PYTHON=${pkgs.python313}/bin/python
             export PYTHONDONTWRITEBYTECODE=1
+
+            # Ephemeral Postgres for development & tests.
+            # Lives in $PWD/.postgres/, listens on a unix socket in the same dir.
+            export PGDATA="$PWD/.postgres/data"
+            export PGHOST="$PWD/.postgres"
+            export PGPORT=5433
+            export PGDATABASE=gb_grid
+            export GB_GRID_DATABASE_URL="postgresql://localhost:$PGPORT/gb_grid?host=$PGHOST"
+
+            mkdir -p "$PGHOST"
+            if [ ! -d "$PGDATA" ]; then
+              echo "[gb-grid] initdb in $PGDATA"
+              initdb --username="$USER" --auth=trust --no-locale --encoding=UTF8 -D "$PGDATA" >/dev/null
+              {
+                echo "unix_socket_directories = '$PGHOST'"
+                echo "listen_addresses = '127.0.0.1'"
+                echo "port = $PGPORT"
+              } >> "$PGDATA/postgresql.conf"
+            fi
+
+            if ! pg_ctl -D "$PGDATA" status >/dev/null 2>&1; then
+              echo "[gb-grid] starting postgres on $PGHOST"
+              pg_ctl -D "$PGDATA" -l "$PGHOST/postgres.log" -o "-k '$PGHOST'" start >/dev/null
+              # Create the dev database if it doesn't exist
+              if ! psql -h "$PGHOST" -lqt | cut -d'|' -f1 | grep -qw gb_grid; then
+                createdb -h "$PGHOST" gb_grid
+              fi
+            fi
+
+            # Stop the cluster when the shell exits.
+            trap 'pg_ctl -D "$PGDATA" stop -m fast >/dev/null 2>&1 || true' EXIT
+
             if [ ! -d .venv ]; then
               uv sync --quiet || true
             fi
             export PATH="$PWD/.venv/bin:$PATH"
-            echo "gb-grid devShell — run 'uv sync' then 'gb-grid --help'"
+
+            # Apply any pending migrations (idempotent).
+            if [ -x .venv/bin/gb-grid ]; then
+              gb-grid migrate >/dev/null 2>&1 || true
+            fi
+
+            echo "gb-grid devShell — postgres on $PGHOST, db=gb_grid"
           '';
         };
       });

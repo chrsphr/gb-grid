@@ -19,8 +19,16 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 
-import duckdb
 import pandas as pd
+import psycopg
+
+
+def _fetchdf(conn: psycopg.Connection, sql: str, params: tuple) -> pd.DataFrame:
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        cols = [d.name for d in cur.description] if cur.description else []
+        rows = cur.fetchall()
+    return pd.DataFrame(rows, columns=cols)
 
 
 def _interp_segments(
@@ -72,61 +80,64 @@ def _interp_segments(
 
 
 def _fetch_pn(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     ngc_units: list[str],
     start: datetime,
     end: datetime,
 ) -> pd.DataFrame:
-    return conn.execute(
+    return _fetchdf(
+        conn,
         """
         SELECT national_grid_bm_unit, time_from, time_to, level_from, level_to
         FROM pn
-        WHERE national_grid_bm_unit = ANY(?)
-          AND time_to >= ? AND time_from < ?
+        WHERE national_grid_bm_unit = ANY(%s)
+          AND time_to >= %s AND time_from < %s
         """,
-        [ngc_units, start, end],
-    ).df()
+        (ngc_units, start, end),
+    )
 
 
 def _fetch_boalf(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     ngc_units: list[str],
     start: datetime,
     end: datetime,
 ) -> pd.DataFrame:
     # BOALF stores ngc_bm_unit; B1610 fills it via nationalGridBmUnitId. Either column.
-    return conn.execute(
+    return _fetchdf(
+        conn,
         """
         SELECT bm_unit, ngc_bm_unit, acceptance_id, acceptance_time,
                time_from, time_to, level_from, level_to, so_flag
         FROM boalf
-        WHERE (ngc_bm_unit = ANY(?) OR bm_unit = ANY(?))
-          AND time_to >= ? AND time_from < ?
+        WHERE (ngc_bm_unit = ANY(%s) OR bm_unit = ANY(%s))
+          AND time_to >= %s AND time_from < %s
         """,
-        [ngc_units, [f"T_{u}" for u in ngc_units] + ngc_units, start, end],
-    ).df()
+        (ngc_units, [f"T_{u}" for u in ngc_units] + ngc_units, start, end),
+    )
 
 
 def _fetch_mels(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     ngc_units: list[str],
     start: datetime,
     end: datetime,
 ) -> pd.DataFrame:
-    return conn.execute(
+    return _fetchdf(
+        conn,
         """
         SELECT national_grid_bm_unit, notification_sequence,
                time_from, time_to, level_from, level_to
         FROM mels
-        WHERE national_grid_bm_unit = ANY(?)
-          AND time_to >= ? AND time_from < ?
+        WHERE national_grid_bm_unit = ANY(%s)
+          AND time_to >= %s AND time_from < %s
         """,
-        [ngc_units, start, end],
-    ).df()
+        (ngc_units, start, end),
+    )
 
 
 def fetch_b1610(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     ngc_units: Iterable[str],
     start: datetime,
     end: datetime,
@@ -138,15 +149,16 @@ def fetch_b1610(
     (DST-adjusted days are not handled — close enough for visual overlay).
     """
     units = list(ngc_units)
-    df = conn.execute(
+    df = _fetchdf(
+        conn,
         """
         SELECT ngc_bm_unit, settlement_date, settlement_period, quantity_mw
         FROM b1610
-        WHERE ngc_bm_unit = ANY(?)
-          AND settlement_date >= ? AND settlement_date <= ?
+        WHERE ngc_bm_unit = ANY(%s)
+          AND settlement_date >= %s AND settlement_date <= %s
         """,
-        [units, start.date(), end.date()],
-    ).df()
+        (units, start.date(), end.date()),
+    )
     if df.empty:
         return df.assign(ts=pd.Series(dtype="datetime64[ns]"))
     df["ts"] = pd.to_datetime(df["settlement_date"]) + pd.to_timedelta(
@@ -157,7 +169,7 @@ def fetch_b1610(
 
 
 def bmu_dispatch(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     ngc_units: Iterable[str],
     start: datetime,
     end: datetime,

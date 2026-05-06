@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from gb_grid.api.client import BMRSClient
-from gb_grid.db import connect, get_watermark
+from gb_grid.db import get_watermark
 from gb_grid.ingest.fuelinst import ingest_fuelinst
 
 
@@ -13,7 +13,7 @@ def client():
     return BMRSClient(client=httpx.Client(base_url="https://example.test"))
 
 
-def test_ingest_fuelinst_writes_rows_and_watermark(httpx_mock, client):
+def test_ingest_fuelinst_writes_rows_and_watermark(httpx_mock, client, db):
     httpx_mock.add_response(
         json={
             "data": [
@@ -34,11 +34,12 @@ def test_ingest_fuelinst_writes_rows_and_watermark(httpx_mock, client):
             ]
         }
     )
-    conn = connect(":memory:")
     n = ingest_fuelinst(
-        conn, client, datetime(2026, 5, 1, 0, 0), datetime(2026, 5, 1, 1, 0)
+        db, client, datetime(2026, 5, 1, 0, 0), datetime(2026, 5, 1, 1, 0)
     )
     assert n == 2
-    assert conn.execute("SELECT count(*) FROM fuelinst").fetchone()[0] == 2
-    wm = get_watermark(conn, "fuelinst")
+    with db.cursor() as cur:
+        cur.execute("SELECT count(*) FROM fuelinst")
+        assert cur.fetchone()[0] == 2
+    wm = get_watermark(db, "fuelinst")
     assert wm is not None

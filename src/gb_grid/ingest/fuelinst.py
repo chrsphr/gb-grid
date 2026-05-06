@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import duckdb
+import psycopg
 
 from ..api.client import BMRSClient
 from ..api.endpoints import fetch_fuelinst
@@ -14,7 +14,7 @@ CONFLICT = ["publish_time", "fuel_type"]
 
 
 def ingest_fuelinst(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     client: BMRSClient,
     start: datetime,
     end: datetime,

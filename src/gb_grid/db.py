@@ -5,109 +5,99 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import duckdb
+import psycopg
+from psycopg.rows import dict_row
+from yoyo import get_backend, read_migrations
 
-from .config import DB_PATH
+from .config import database_url
 
-SCHEMA_DIR = Path(__file__).parent / "schema"
-
-
-def connect(db_path: Path | str | None = None) -> duckdb.DuckDBPyConnection:
-    path = Path(db_path) if db_path is not None else DB_PATH
-    if str(path) != ":memory:":
-        path.parent.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(path))
-    migrate(conn)
-    return conn
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 
-def migrate(conn: duckdb.DuckDBPyConnection) -> None:
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS schema_migrations ("
-        "  version TEXT PRIMARY KEY,"
-        "  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-        ")"
-    )
-    applied = {row[0] for row in conn.execute("SELECT version FROM schema_migrations").fetchall()}
-    for sql_file in sorted(SCHEMA_DIR.glob("*.sql")):
-        version = sql_file.stem
-        if version in applied:
-            continue
-        conn.execute(sql_file.read_text())
-        conn.execute("INSERT INTO schema_migrations(version) VALUES (?)", [version])
+def _resolve_url(url: str | None = None) -> str:
+    resolved = url or database_url()
+    if not resolved:
+        raise RuntimeError(
+            "GB_GRID_DATABASE_URL is not set. "
+            "In `nix develop` it's set automatically; otherwise export it."
+        )
+    return resolved
+
+
+def connect(url: str | None = None) -> psycopg.Connection:
+    return psycopg.connect(_resolve_url(url), autocommit=True)
+
+
+def migrate(url: str | None = None) -> int:
+    """Apply all pending yoyo migrations. Returns the number applied."""
+    resolved = _resolve_url(url)
+    # yoyo defaults to psycopg2 for postgresql:// URLs; tell it to use psycopg v3.
+    if resolved.startswith("postgresql://") and "+" not in resolved.split("://", 1)[0]:
+        resolved = "postgresql+psycopg://" + resolved.split("://", 1)[1]
+    backend = get_backend(resolved)
+    migrations = read_migrations(str(MIGRATIONS_DIR))
+    to_apply = backend.to_apply(migrations)
+    n = len(list(to_apply))
+    with backend.lock():
+        backend.apply_migrations(backend.to_apply(migrations))
+    return n
 
 
 def upsert(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     table: str,
     rows: Sequence[dict[str, Any]],
     conflict_cols: Sequence[str],
 ) -> int:
-    """Upsert rows into ``table`` using DuckDB's bulk DataFrame ingestion.
-
-    Builds a pandas DataFrame, registers it as a view, and runs a single
-    ``INSERT … SELECT … ON CONFLICT DO UPDATE``. This is dramatically faster
-    than ``executemany`` for non-trivial batches (typically 10–100×).
-    """
+    """Bulk upsert via a single ``INSERT … VALUES … ON CONFLICT DO UPDATE``."""
     if not rows:
         return 0
-    import pandas as pd  # local import keeps import cost off the hot path until needed
 
     cols = list(rows[0].keys())
-    df = pd.DataFrame(rows, columns=cols)
-
     update_cols = [c for c in cols if c not in conflict_cols]
-    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    placeholders = "(" + ", ".join(["%s"] * len(cols)) + ")"
     conflict = ", ".join(conflict_cols)
-    select_list = ", ".join(cols)
 
-    if set_clause:
-        sql = (
-            f"INSERT INTO {table} ({select_list}) "
-            f"SELECT {select_list} FROM _gb_staging "
-            f"ON CONFLICT ({conflict}) DO UPDATE SET {set_clause}"
-        )
+    if update_cols:
+        set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+        tail = f"ON CONFLICT ({conflict}) DO UPDATE SET {set_clause}"
     else:
-        sql = (
-            f"INSERT INTO {table} ({select_list}) "
-            f"SELECT {select_list} FROM _gb_staging "
-            f"ON CONFLICT ({conflict}) DO NOTHING"
-        )
+        tail = f"ON CONFLICT ({conflict}) DO NOTHING"
 
-    conn.register("_gb_staging", df)
-    try:
-        conn.execute("BEGIN")
-        try:
-            conn.execute(sql)
-            conn.execute("COMMIT")
-        except Exception:
-            conn.execute("ROLLBACK")
-            raise
-    finally:
-        conn.unregister("_gb_staging")
+    values = [tuple(r.get(c) for c in cols) for r in rows]
+    sql = f"INSERT INTO {table} ({col_list}) VALUES {placeholders} {tail}"
+
+    with conn.cursor() as cur:
+        cur.executemany(sql, values)
     return len(rows)
 
 
-def set_watermark(conn: duckdb.DuckDBPyConnection, dataset: str, last_ts: datetime) -> None:
-    conn.execute(
-        "INSERT INTO ingest_watermark(dataset, last_ts, updated_at) "
-        "VALUES (?, ?, CURRENT_TIMESTAMP) "
-        "ON CONFLICT (dataset) DO UPDATE SET "
-        "  last_ts = EXCLUDED.last_ts, updated_at = EXCLUDED.updated_at",
-        [dataset, last_ts],
-    )
+def set_watermark(conn: psycopg.Connection, dataset: str, last_ts: datetime) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO ingest_watermark(dataset, last_ts, updated_at) "
+            "VALUES (%s, %s, CURRENT_TIMESTAMP) "
+            "ON CONFLICT (dataset) DO UPDATE SET "
+            "  last_ts = EXCLUDED.last_ts, updated_at = EXCLUDED.updated_at",
+            (dataset, last_ts),
+        )
 
 
-def get_watermark(conn: duckdb.DuckDBPyConnection, dataset: str) -> datetime | None:
-    row = conn.execute(
-        "SELECT last_ts FROM ingest_watermark WHERE dataset = ?", [dataset]
-    ).fetchone()
+def get_watermark(conn: psycopg.Connection, dataset: str) -> datetime | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT last_ts FROM ingest_watermark WHERE dataset = %s", (dataset,)
+        )
+        row = cur.fetchone()
     return row[0] if row else None
 
 
-def table_stats(conn: duckdb.DuckDBPyConnection, table: str, ts_col: str) -> dict[str, Any]:
-    row = conn.execute(f"SELECT count(*), max({ts_col}) FROM {table}").fetchone()
-    return {"table": table, "rows": row[0], "latest": row[1]}
+def table_stats(conn: psycopg.Connection, table: str, ts_col: str) -> dict[str, Any]:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(f"SELECT count(*) AS rows, max({ts_col}) AS latest FROM {table}")
+        row = cur.fetchone()
+    return {"table": table, "rows": row["rows"], "latest": row["latest"]}
 
 
 def iter_chunks(

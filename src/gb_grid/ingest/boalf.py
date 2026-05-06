@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import duckdb
+import psycopg
 
 from ..api.client import BMRSClient
 from ..api.endpoints import fetch_boalf
@@ -14,7 +14,7 @@ CONFLICT = ["acceptance_id", "time_from"]
 
 
 def ingest_boalf(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     client: BMRSClient,
     start: datetime,
     end: datetime,

@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterator
 from datetime import date, datetime, timedelta
 from typing import Any
 
-import duckdb
+import psycopg
 import structlog
 
 from ..db import set_watermark, upsert
@@ -31,7 +31,7 @@ def datetime_range(
 
 
 def run_window(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     *,
     dataset: str,
     table: str,

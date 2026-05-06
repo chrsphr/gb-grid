@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 
-import duckdb
+import psycopg
 
 from ..api.client import BMRSClient
 from ..api.endpoints import fetch_system_prices
@@ -14,7 +14,7 @@ CONFLICT = ["settlement_date", "settlement_period"]
 
 
 def ingest_system_prices(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     client: BMRSClient,
     start: date,
     end: date,

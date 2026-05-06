@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-import duckdb
+import psycopg
 
 from ..api.client import BMRSClient
 from ..api.endpoints import fetch_b1610
@@ -15,7 +15,7 @@ CONFLICT = ["settlement_date", "settlement_period", "bm_unit"]
 
 
 def ingest_b1610(
-    conn: duckdb.DuckDBPyConnection,
+    conn: psycopg.Connection,
     client: BMRSClient,
     start: date,
     end: date,

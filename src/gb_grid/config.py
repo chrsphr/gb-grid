@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = Path(os.environ.get("GB_GRID_DATA_DIR", REPO_ROOT / "data"))
-DB_PATH = Path(os.environ.get("GB_GRID_DB", DATA_DIR / "gb_grid.duckdb"))
+
+def database_url() -> str | None:
+    return os.environ.get("GB_GRID_DATABASE_URL")
 
 API_BASE_URL = os.environ.get(
     "GB_GRID_API_BASE", "https://data.elexon.co.uk/bmrs/api/v1"

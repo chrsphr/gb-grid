@@ -9,8 +9,8 @@ import structlog
 import typer
 
 from .api.client import BMRSClient
-from .config import DB_PATH
-from .db import connect, table_stats
+from .config import database_url
+from .db import connect, migrate as run_migrate, table_stats
 from .ingest import DATASETS
 from .ingest.b1610 import ingest_b1610
 from .ingest.boalf import ingest_boalf
@@ -32,6 +32,13 @@ app = typer.Typer(help="GB power grid energy database CLI.", no_args_is_help=Tru
 
 def _parse_date(s: str) -> date:
     return datetime.strptime(s, "%Y-%m-%d").date()
+
+
+@app.command()
+def migrate() -> None:
+    """Apply any pending database migrations."""
+    n = run_migrate()
+    typer.echo(f"applied {n} migration(s)")
 
 
 @app.command()
@@ -97,13 +104,15 @@ def status() -> None:
             table_stats(conn, "mels", "time_from"),
             table_stats(conn, "system_prices", "settlement_date"),
         ]
-        wm = conn.execute(
-            "SELECT dataset, last_ts, updated_at FROM ingest_watermark ORDER BY dataset"
-        ).fetchall()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT dataset, last_ts, updated_at FROM ingest_watermark ORDER BY dataset"
+            )
+            wm = cur.fetchall()
     finally:
         conn.close()
 
-    typer.echo(f"db: {DB_PATH}")
+    typer.echo(f"db: {database_url()}")
     typer.echo("table          rows         latest")
     for r in rows:
         typer.echo(f"{r['table']:<14} {r['rows']:<12} {r['latest']}")
@@ -115,8 +124,11 @@ def status() -> None:
 
 @app.command()
 def sql() -> None:
-    """Open the DuckDB CLI on the database file."""
-    os.execvp("duckdb", ["duckdb", str(DB_PATH)])
+    """Open psql against the configured database."""
+    url = database_url()
+    if not url:
+        raise typer.BadParameter("GB_GRID_DATABASE_URL is not set")
+    os.execvp("psql", ["psql", url])
 
 
 if __name__ == "__main__":
