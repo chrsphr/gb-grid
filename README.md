@@ -1,5 +1,8 @@
 # gb-grid
 
+> [!CAUTION]
+> This repo is almost entirely vibe-coded. Do not expect quality, but also, let me assure you it would be even worse if I attempted to write this myself.
+
 Local DuckDB database of GB power grid data, fed from the [Elexon BMRS Insights API](https://data.elexon.co.uk/bmrs/api/v1).
 
 ## Quick start
