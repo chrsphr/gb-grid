@@ -25,6 +25,7 @@
             tenacity
             psycopg
             psycopg-pool
+            psycopg2
             yoyo-migrations
             pydantic
             typer

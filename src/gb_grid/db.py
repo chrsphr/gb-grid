@@ -30,11 +30,7 @@ def connect(url: str | None = None) -> psycopg.Connection:
 
 def migrate(url: str | None = None) -> int:
     """Apply all pending yoyo migrations. Returns the number applied."""
-    resolved = _resolve_url(url)
-    # yoyo defaults to psycopg2 for postgresql:// URLs; tell it to use psycopg v3.
-    if resolved.startswith("postgresql://") and "+" not in resolved.split("://", 1)[0]:
-        resolved = "postgresql+psycopg://" + resolved.split("://", 1)[1]
-    backend = get_backend(resolved)
+    backend = get_backend(_resolve_url(url))
     migrations = read_migrations(str(MIGRATIONS_DIR))
     to_apply = backend.to_apply(migrations)
     n = len(list(to_apply))
