@@ -16,7 +16,7 @@ status:
     gb-grid status
 
 sql:
-    duckdb data/gb_grid.duckdb
+    gb-grid sql
 
 test:
     pytest
