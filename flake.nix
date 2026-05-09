@@ -20,6 +20,10 @@
 
           build-system = with python.pkgs; [ hatchling ];
 
+          # nixpkgs ships psycopg2 (source build); the wheel asks for
+          # psycopg2-binary. They're functionally identical at runtime.
+          pythonRemoveDeps = [ "psycopg2-binary" ];
+
           dependencies = with python.pkgs; [
             httpx
             tenacity
