@@ -93,7 +93,7 @@
             trap 'pg_ctl -D "$PGDATA" stop -m fast >/dev/null 2>&1 || true' EXIT
 
             if [ ! -d .venv ]; then
-              uv sync --quiet || true
+              uv sync --quiet --all-extras || true
             fi
             export PATH="$PWD/.venv/bin:$PATH"
 
