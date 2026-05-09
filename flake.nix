@@ -35,6 +35,7 @@
             typer
             structlog
             python-dateutil
+            pandas
           ];
 
           doCheck = false;

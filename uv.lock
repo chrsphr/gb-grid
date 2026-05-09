@@ -586,6 +586,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
+    { name = "pandas" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "psycopg2-binary" },
     { name = "pydantic" },
@@ -616,6 +617,7 @@ requires-dist = [
     { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=6.29" },
     { name = "jupyterlab", marker = "extra == 'notebook'", specifier = ">=4.2" },
     { name = "matplotlib", marker = "extra == 'notebook'", specifier = ">=3.9" },
+    { name = "pandas", specifier = ">=2.2" },
     { name = "pandas", marker = "extra == 'dev'", specifier = ">=2.2" },
     { name = "pandas", marker = "extra == 'notebook'", specifier = ">=2.2" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2" },
