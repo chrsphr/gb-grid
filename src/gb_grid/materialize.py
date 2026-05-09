@@ -22,19 +22,16 @@ CONFLICT_COLS = ("bmu", "ts")
 
 
 def _active_bmus(conn: psycopg.Connection, start: datetime, end: datetime) -> list[str]:
-    """BMUs with at least one BOA acceptance in the window.
+    """BMUs with PN data in the window — i.e. essentially every BMU.
 
-    Most BMUs sit on their FPN with no acceptance — for those the materialized
-    series adds no information beyond the raw ``pn`` table, so we skip them.
-    BOALF stores either ``ngc_bm_unit`` (preferred) or ``bm_unit`` (often
-    prefixed ``T_<NGC>``); we coalesce both into the NGC name used by ``pn``.
+    Even units that never receive a BOA are worth materializing so the
+    dashboard can compare planned (PN) vs actual (B1610) generation.
     """
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT DISTINCT
-              COALESCE(ngc_bm_unit, regexp_replace(bm_unit, '^T_', ''))
-            FROM boalf
+            SELECT DISTINCT national_grid_bm_unit
+            FROM pn
             WHERE time_to >= %s AND time_from < %s
             """,
             (start, end),
