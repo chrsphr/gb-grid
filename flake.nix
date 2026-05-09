@@ -161,5 +161,9 @@ EOF
             echo "gb-grid devShell — postgres on $PGHOST, db=gb_grid, grafana on :$GF_PORT"
           '';
         };
-      });
+      }) // {
+        # NixOS module that bundles Postgres + Grafana + the ingester.
+        # Consumers pass the app derivation via specialArgs as `gb-grid-pkg`.
+        nixosModules.default = import ./nix/module.nix;
+      };
 }
