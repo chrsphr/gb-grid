@@ -7,13 +7,16 @@ the heavy pandas work happens here, not at dashboard render time.
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
+from typing import Any
 
 import psycopg
 import structlog
 
 from .analytics import bmu_dispatch
-from .db import upsert
+from .db import connect, upsert
 
 log = structlog.get_logger(__name__)
 
@@ -39,28 +42,19 @@ def _active_bmus(conn: psycopg.Connection, start: datetime, end: datetime) -> li
         return [r[0] for r in cur.fetchall() if r[0]]
 
 
-def materialize_dispatch(
-    conn: psycopg.Connection,
-    start: datetime,
-    end: datetime,
-    bmus: list[str] | None = None,
-    freq: str = "5min",
-) -> int:
-    """Compute per-minute dispatch for ``bmus`` (or all active) and upsert.
-
-    Returns the number of rows written.
-    """
-    units = bmus or _active_bmus(conn, start, end)
-    if not units:
-        log.info("materialize_dispatch_no_bmus", start=start, end=end)
-        return 0
-
-    df = bmu_dispatch(conn, units, start, end, freq=freq)
+def _rows_for_units(
+    units: list[str], start: datetime, end: datetime, freq: str
+) -> list[dict[str, Any]]:
+    """Worker entry point: compute dispatch for ``units`` and return upsert rows."""
+    conn = connect()
+    try:
+        df = bmu_dispatch(conn, units, start, end, freq=freq)
+    finally:
+        conn.close()
     if df.empty:
-        return 0
-
+        return []
     df = df.dropna(subset=["pn_mw", "boa_level_mw"], how="all")
-    rows = [
+    return [
         {
             "bmu": r.ngc_bm_unit,
             "ts": r.ts.to_pydatetime(),
@@ -73,6 +67,52 @@ def materialize_dispatch(
         }
         for r in df.itertuples(index=False)
     ]
-    n = upsert(conn, TABLE, rows, CONFLICT_COLS)
-    log.info("materialize_dispatch_wrote", rows=n, units=len(units), start=start, end=end)
-    return n
+
+
+def materialize_dispatch(
+    conn: psycopg.Connection,
+    start: datetime,
+    end: datetime,
+    bmus: list[str] | None = None,
+    freq: str = "5min",
+    workers: int | None = None,
+) -> int:
+    """Compute per-minute dispatch for ``bmus`` (or all active) and upsert.
+
+    Splits BMUs across a process pool — the per-segment numpy work in
+    ``_interp_segments`` is pure-Python overhead-bound, so threads don't help.
+    Returns the number of rows written.
+    """
+    units = bmus or _active_bmus(conn, start, end)
+    if not units:
+        log.info("materialize_dispatch_no_bmus", start=start, end=end)
+        return 0
+
+    n_workers = workers or max(1, (os.cpu_count() or 2) - 1)
+    n_workers = min(n_workers, len(units))
+
+    # Round-robin so each worker sees a mix of heavy/light BMUs rather than
+    # one shard getting all the alphabetically-clustered baseload units.
+    chunks = [units[i::n_workers] for i in range(n_workers)]
+
+    total = 0
+    if n_workers == 1:
+        rows = _rows_for_units(units, start, end, freq)
+        total = upsert(conn, TABLE, rows, CONFLICT_COLS)
+    else:
+        with ProcessPoolExecutor(max_workers=n_workers) as pool:
+            futures = [pool.submit(_rows_for_units, c, start, end, freq) for c in chunks]
+            for fut in as_completed(futures):
+                rows = fut.result()
+                if rows:
+                    total += upsert(conn, TABLE, rows, CONFLICT_COLS)
+
+    log.info(
+        "materialize_dispatch_wrote",
+        rows=total,
+        units=len(units),
+        workers=n_workers,
+        start=start,
+        end=end,
+    )
+    return total

@@ -92,6 +92,10 @@ def materialize_dispatch_cmd(
         list[str] | None,
         typer.Option("--bmu", "-b", help="Repeatable. Default: all BMUs with PN data."),
     ] = None,
+    workers: Annotated[
+        int | None,
+        typer.Option("--workers", "-j", help="Process pool size. Default: ncpu-1."),
+    ] = None,
 ) -> None:
     """Recompute bmu_dispatch (only BMUs with BOA acceptances in the window)."""
     from .materialize import materialize_dispatch
@@ -100,7 +104,7 @@ def materialize_dispatch_cmd(
     end_dt = datetime.combine(_parse_date(to), time.max)
     conn = connect()
     try:
-        n = materialize_dispatch(conn, start_dt, end_dt, bmus=bmu)
+        n = materialize_dispatch(conn, start_dt, end_dt, bmus=bmu, workers=workers)
     finally:
         conn.close()
     typer.echo(f"wrote {n} rows")
