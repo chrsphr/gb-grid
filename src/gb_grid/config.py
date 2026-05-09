@@ -23,6 +23,7 @@ class PollConfig:
     pn_seconds: int = 300
     mels_seconds: int = 300
     system_prices_seconds: int = 3600
+    materialize_seconds: int = 300
 
 
 POLL = PollConfig()

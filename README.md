@@ -36,9 +36,28 @@ password), the test suite, and the CLI all just work.
 
 - `gb-grid migrate` — apply pending yoyo migrations
 - `gb-grid backfill --from YYYY-MM-DD --to YYYY-MM-DD [--dataset fuelinst,b1610,...]`
-- `gb-grid run` — always-on async scheduler
+- `gb-grid materialize-dispatch --from YYYY-MM-DD --to YYYY-MM-DD [--bmu PEHE-1 ...]` — recompute per-BMU dispatch series into `bmu_dispatch` (5-min resolution, only BMUs with BOA acceptances in the window)
+- `gb-grid run` — always-on async scheduler (also rolls the materialized table forward)
 - `gb-grid status` — row counts and latest timestamps
 - `gb-grid sql` — open `psql` against the configured database
+
+## Grafana
+
+The devShell starts an ephemeral Grafana on <http://localhost:3000> (anonymous
+Editor access; admin/admin if you want to log in). It's provisioned from
+`grafana/`:
+
+- `provisioning/datasources/postgres.yaml` — the local Postgres datasource (uid `gbgrid`)
+- `provisioning/dashboards/dashboards.yaml` — file provider pointing at `grafana/dashboards/`
+- `dashboards/bmu_dispatch.json` — pick a BMU from the variable to see PN, dispatched, MEL, B1610 actual, plus turn-up/curtailment
+
+Backfill, then materialize, then open Grafana:
+
+```bash
+gb-grid backfill --from 2026-04-01 --to 2026-04-07
+gb-grid materialize-dispatch --from 2026-04-01 --to 2026-04-07
+xdg-open http://localhost:3000/d/bmu-dispatch
+```
 
 ## Migrations
 

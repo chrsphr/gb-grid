@@ -1,0 +1,114 @@
+{
+  "title": "BMU dispatch",
+  "uid": "bmu-dispatch",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "bmu",
+        "label": "BMU",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "gbgrid" },
+        "query": "SELECT DISTINCT bmu FROM bmu_dispatch ORDER BY bmu",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "$bmu — PN, dispatched, MEL, B1610 actual",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "MW",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1.5,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "MEL" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "custom.lineWidth", "value": 1 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Dispatched" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "gray" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "B1610 actual" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "black" } },
+              { "id": "custom.lineWidth", "value": 2.5 },
+              { "id": "custom.lineInterpolation", "value": "stepAfter" }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT ts AS time, pn_mw AS \"PN\", boa_level_mw AS \"Dispatched\", mel_mw AS \"MEL\" FROM bmu_dispatch WHERE bmu = '$bmu' AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY ts"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawSql": "SELECT (settlement_date::timestamp + (settlement_period * INTERVAL '30 minutes')) AS time, quantity_mw AS \"B1610 actual\" FROM b1610 WHERE ngc_bm_unit = '$bmu' AND (settlement_date::timestamp + (settlement_period * INTERVAL '30 minutes')) BETWEEN $__timeFrom() AND $__timeTo() ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "$bmu — SO turn-up (+) and BOA curtailment (−)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "MW",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 40
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SO turn-up" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "BOA curtailment" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "SO curtailment" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT ts AS time, so_turnup_mw AS \"SO turn-up\", -boa_curtailment_mw AS \"BOA curtailment\", -so_curtailment_mw AS \"SO curtailment\" FROM bmu_dispatch WHERE bmu = '$bmu' AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY ts"
+        }
+      ]
+    }
+  ]
+}

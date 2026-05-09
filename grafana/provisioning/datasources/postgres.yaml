@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: gb-grid
+    type: postgres
+    uid: gbgrid
+    access: proxy
+    url: 127.0.0.1:${PGPORT}
+    user: ${USER}
+    isDefault: true
+    jsonData:
+      database: ${PGDATABASE}
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false

@@ -44,6 +44,7 @@
             python313
             uv
             postgresql_16
+            grafana
             just
             ruff
             stdenv.cc.cc.lib   # libstdc++.so.6 for prebuilt wheels (pyzmq, etc.)
@@ -89,9 +90,6 @@
               fi
             fi
 
-            # Stop the cluster when the shell exits.
-            trap 'pg_ctl -D "$PGDATA" stop -m fast >/dev/null 2>&1 || true' EXIT
-
             if [ ! -d .venv ]; then
               uv sync --quiet --all-extras || true
             fi
@@ -102,7 +100,60 @@
               gb-grid migrate >/dev/null 2>&1 || true
             fi
 
-            echo "gb-grid devShell — postgres on $PGHOST, db=gb_grid"
+            # Ephemeral Grafana on :3000, provisioned from ./grafana/.
+            export GF_PORT=3000
+            export GF_PATHS_DATA="$PWD/.grafana/data"
+            export GF_PATHS_LOGS="$PWD/.grafana/logs"
+            export GF_PATHS_PLUGINS="$PWD/.grafana/plugins"
+            export GF_PATHS_PROVISIONING="$PWD/.grafana/provisioning"
+            export GB_GRID_DASHBOARDS_DIR="$PWD/grafana/dashboards"
+            mkdir -p "$GF_PATHS_DATA" "$GF_PATHS_LOGS" "$GF_PATHS_PLUGINS" "$GF_PATHS_PROVISIONING"
+
+            # Render provisioning templates with current env values (Grafana's own
+            # $VAR substitution is unreliable across versions / unbraced names).
+            ${pkgs.findutils}/bin/find "$PWD/grafana/provisioning" -type f | while read -r src; do
+              dst="$GF_PATHS_PROVISIONING/''${src#$PWD/grafana/provisioning/}"
+              mkdir -p "$(dirname "$dst")"
+              ${pkgs.envsubst}/bin/envsubst < "$src" > "$dst"
+            done
+
+            cat > "$PWD/.grafana/grafana.ini" <<EOF
+[server]
+http_port = $GF_PORT
+[paths]
+data = $GF_PATHS_DATA
+logs = $GF_PATHS_LOGS
+plugins = $GF_PATHS_PLUGINS
+provisioning = $GF_PATHS_PROVISIONING
+[auth.anonymous]
+enabled = true
+org_role = Editor
+[security]
+admin_user = admin
+admin_password = admin
+allow_embedding = true
+[analytics]
+reporting_enabled = false
+check_for_updates = false
+EOF
+
+            if ! kill -0 "$(cat "$PWD/.grafana/grafana.pid" 2>/dev/null)" 2>/dev/null; then
+              echo "[gb-grid] starting grafana on http://localhost:$GF_PORT"
+              ${pkgs.grafana}/bin/grafana server \
+                --homepath ${pkgs.grafana}/share/grafana \
+                --config "$PWD/.grafana/grafana.ini" \
+                >"$GF_PATHS_LOGS/grafana.out" 2>&1 &
+              echo $! > "$PWD/.grafana/grafana.pid"
+            fi
+
+            # Stop postgres + grafana when the shell exits.
+            trap '
+              pg_ctl -D "$PGDATA" stop -m fast >/dev/null 2>&1 || true
+              [ -f "$PWD/.grafana/grafana.pid" ] && kill "$(cat "$PWD/.grafana/grafana.pid")" 2>/dev/null || true
+              rm -f "$PWD/.grafana/grafana.pid"
+            ' EXIT
+
+            echo "gb-grid devShell — postgres on $PGHOST, db=gb_grid, grafana on :$GF_PORT"
           '';
         };
       });

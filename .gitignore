@@ -1,5 +1,6 @@
 .venv/
 .postgres/
+.grafana/
 __pycache__/
 *.pyc
 .pytest_cache/

@@ -9,6 +9,9 @@ sync:
 backfill FROM TO *DATASETS:
     gb-grid backfill --from {{FROM}} --to {{TO}} {{DATASETS}}
 
+materialize FROM TO:
+    gb-grid materialize-dispatch --from {{FROM}} --to {{TO}}
+
 run:
     gb-grid run
 

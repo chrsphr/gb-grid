@@ -14,6 +14,7 @@ from .ingest.fuelinst import ingest_fuelinst
 from .ingest.mels import ingest_mels
 from .ingest.pn import ingest_pn
 from .ingest.system_prices import ingest_system_prices
+from .materialize import materialize_dispatch
 
 log = structlog.get_logger(__name__)
 
@@ -96,6 +97,15 @@ def _system_prices_tick() -> None:
         conn.close()
 
 
+def _materialize_tick() -> None:
+    conn = connect()
+    try:
+        now = _utcnow()
+        materialize_dispatch(conn, now - timedelta(hours=6), now)
+    finally:
+        conn.close()
+
+
 async def run_scheduler() -> None:
     log.info("scheduler_starting")
     await asyncio.gather(
@@ -105,4 +115,5 @@ async def run_scheduler() -> None:
         _loop("pn", POLL.pn_seconds, _pn_tick),
         _loop("mels", POLL.mels_seconds, _mels_tick),
         _loop("system_prices", POLL.system_prices_seconds, _system_prices_tick),
+        _loop("materialize_dispatch", POLL.materialize_seconds, _materialize_tick),
     )

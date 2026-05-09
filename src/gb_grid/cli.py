@@ -10,7 +10,8 @@ import typer
 
 from .api.client import BMRSClient
 from .config import database_url
-from .db import connect, migrate as run_migrate, table_stats
+from .db import connect, table_stats
+from .db import migrate as run_migrate
 from .ingest import DATASETS
 from .ingest.b1610 import ingest_b1610
 from .ingest.boalf import ingest_boalf
@@ -81,6 +82,28 @@ def backfill(
     finally:
         conn.close()
     typer.echo("done.")
+
+
+@app.command("materialize-dispatch")
+def materialize_dispatch_cmd(
+    from_: Annotated[str, typer.Option("--from", help="YYYY-MM-DD inclusive")],
+    to: Annotated[str, typer.Option("--to", help="YYYY-MM-DD inclusive")],
+    bmu: Annotated[
+        list[str] | None,
+        typer.Option("--bmu", "-b", help="Repeatable. Default: all BMUs with PN data."),
+    ] = None,
+) -> None:
+    """Recompute bmu_dispatch (only BMUs with BOA acceptances in the window)."""
+    from .materialize import materialize_dispatch
+
+    start_dt = datetime.combine(_parse_date(from_), time.min)
+    end_dt = datetime.combine(_parse_date(to), time.max)
+    conn = connect()
+    try:
+        n = materialize_dispatch(conn, start_dt, end_dt, bmus=bmu)
+    finally:
+        conn.close()
+    typer.echo(f"wrote {n} rows")
 
 
 @app.command()
