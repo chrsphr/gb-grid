@@ -60,7 +60,10 @@ def _b1610_tick() -> None:
     try:
         with BMRSClient() as client:
             today = _utcnow().date()
-            ingest_b1610(conn, client, today - timedelta(days=7), today)
+            # B1610 has a ~5-working-day publication lag. Sit the window firmly
+            # inside the published zone so every tick pulls real data and has
+            # buffer on both sides to absorb late publication / revisions.
+            ingest_b1610(conn, client, today - timedelta(days=14), today - timedelta(days=3))
     finally:
         conn.close()
 
