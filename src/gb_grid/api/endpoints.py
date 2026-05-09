@@ -91,7 +91,7 @@ def fetch_b1610(
                 "ngc_bm_unit": _get(
                     r, "nationalGridBmUnitId", "nationalGridBmUnit", "ngcBmUnit"
                 ),
-                "quantity_mw": _get(r, "quantity", "Quantity", "generation"),
+                "quantity_mwh": _get(r, "quantity", "Quantity", "generation"),
             }
         )
     return out
