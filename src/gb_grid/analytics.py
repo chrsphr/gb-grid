@@ -142,14 +142,16 @@ def fetch_b1610(
     start: datetime,
     end: datetime,
 ) -> pd.DataFrame:
-    """Per-BMU half-hourly actual generation, indexed by half-hour end time.
+    """Per-BMU half-hourly actual generation, indexed by half-hour start time.
 
-    Returns columns: ``ts`` (settlement period end time), ``ngc_bm_unit``,
+    Returns columns: ``ts`` (settlement period start time), ``ngc_bm_unit``,
     ``quantity_mw``. The B1610 API reports MWh delivered over the 30-minute
     settlement period; we multiply by 2 to express it as average MW so it
-    overlays directly on the PN/BOA series. Settlement period N ends at
-    midnight + N*30 minutes (DST-adjusted days are not handled — close
-    enough for visual overlay).
+    overlays directly on the PN/BOA series. ``ts`` is the period *start* so
+    the value visually aligns with the window it averages — render with
+    ``steps-post`` to draw a step covering the full half-hour.
+    Settlement period N starts at midnight + (N-1)*30 minutes (DST-adjusted
+    days are not handled — close enough for visual overlay).
     """
     units = list(ngc_units)
     df = _fetchdf(
@@ -165,7 +167,7 @@ def fetch_b1610(
     if df.empty:
         return df.assign(ts=pd.Series(dtype="datetime64[ns]"), quantity_mw=pd.Series(dtype="float64"))
     df["ts"] = pd.to_datetime(df["settlement_date"]) + pd.to_timedelta(
-        df["settlement_period"] * 30, unit="m"
+        (df["settlement_period"] - 1) * 30, unit="m"
     )
     df["quantity_mw"] = df["quantity_mwh"] * 2.0
     df = df[(df["ts"] >= start) & (df["ts"] <= end)]

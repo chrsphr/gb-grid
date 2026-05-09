@@ -68,7 +68,7 @@
         {
           "refId": "B",
           "format": "time_series",
-          "rawSql": "SELECT (settlement_date::timestamp + (settlement_period * INTERVAL '30 minutes')) AS time, quantity_mwh * 2 AS \"B1610 actual\" FROM b1610 WHERE ngc_bm_unit = '$bmu' AND (settlement_date::timestamp + (settlement_period * INTERVAL '30 minutes')) BETWEEN $__timeFrom() AND $__timeTo() ORDER BY 1"
+          "rawSql": "SELECT (settlement_date::timestamp + ((settlement_period - 1) * INTERVAL '30 minutes')) AS time, quantity_mwh * 2 AS \"B1610 actual\" FROM b1610 WHERE ngc_bm_unit = '$bmu' AND (settlement_date::timestamp + ((settlement_period - 1) * INTERVAL '30 minutes')) BETWEEN $__timeFrom() AND $__timeTo() ORDER BY 1"
         }
       ]
     },
