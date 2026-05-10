@@ -2,17 +2,17 @@
   "title": "BMU dispatch",
   "uid": "bmu-dispatch",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 4,
   "refresh": "30s",
   "time": { "from": "now-24h", "to": "now" },
   "templating": {
     "list": [
       {
-        "name": "bmu",
-        "label": "BMU",
+        "name": "station",
+        "label": "Station",
         "type": "query",
         "datasource": { "type": "postgres", "uid": "gbgrid" },
-        "query": "SELECT DISTINCT bmu FROM bmu_dispatch ORDER BY bmu",
+        "query": "SELECT DISTINCT b.station FROM bmu b JOIN bmu_dispatch d ON d.bmu = b.ngc_bm_unit ORDER BY 1",
         "refresh": 1,
         "includeAll": false,
         "multi": false
@@ -23,14 +23,14 @@
     {
       "id": 3,
       "type": "geomap",
-      "title": "BMUs — click a marker to select",
+      "title": "Stations — click to select",
       "datasource": { "type": "postgres", "uid": "gbgrid" },
       "gridPos": { "h": 22, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
-          "rawSql": "SELECT ngc_bm_unit, bm_unit, COALESCE(bmrs_fuel_type, 'UNKNOWN') AS fuel_type, latitude, longitude FROM bmu WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
+          "rawSql": "SELECT station, AVG(latitude) AS latitude, AVG(longitude) AS longitude, MODE() WITHIN GROUP (ORDER BY COALESCE(bmrs_fuel_type, 'UNKNOWN')) AS fuel_type, COUNT(*) AS bmus FROM bmu WHERE latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station"
         }
       ],
       "fieldConfig": {
@@ -38,8 +38,8 @@
           "color": { "mode": "palette-classic" },
           "links": [
             {
-              "title": "Select ${__data.fields.ngc_bm_unit}",
-              "url": "/d/bmu-dispatch?var-bmu=${__data.fields.ngc_bm_unit}&${__url_time_range}",
+              "title": "Select ${__data.fields.station}",
+              "url": "/d/bmu-dispatch?var-station=${__data.fields.station}&${__url_time_range}",
               "targetBlank": false
             }
           ]
@@ -92,10 +92,10 @@
         "layers": [
           {
             "type": "markers",
-            "name": "BMUs",
+            "name": "Stations",
             "config": {
               "style": {
-                "size": { "fixed": 6 },
+                "size": { "fixed": 7 },
                 "color": { "field": "fuel_type" },
                 "opacity": 0.85,
                 "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" },
@@ -113,7 +113,7 @@
     {
       "id": 1,
       "type": "timeseries",
-      "title": "$bmu — PN, dispatched, MEL, B1610 actual",
+      "title": "$station — station total (PN, dispatched, MEL, B1610)",
       "datasource": { "type": "postgres", "uid": "gbgrid" },
       "gridPos": { "h": 12, "w": 12, "x": 0, "y": 0 },
       "fieldConfig": {
@@ -153,21 +153,46 @@
         {
           "refId": "A",
           "format": "time_series",
-          "rawSql": "SELECT ts AS time, pn_mw AS \"PN\", boa_level_mw AS \"Dispatched\", mel_mw AS \"MEL\" FROM bmu_dispatch WHERE bmu = '$bmu' AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY ts"
+          "rawSql": "SELECT d.ts AS time, SUM(d.pn_mw) AS \"PN\", SUM(d.boa_level_mw) AS \"Dispatched\", SUM(d.mel_mw) AS \"MEL\" FROM bmu_dispatch d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY d.ts ORDER BY d.ts"
         },
         {
           "refId": "B",
           "format": "time_series",
-          "rawSql": "SELECT (settlement_date::timestamp + ((settlement_period - 1) * INTERVAL '30 minutes')) AS time, quantity_mwh * 2 AS \"B1610 actual\" FROM b1610 WHERE ngc_bm_unit = '$bmu' AND (settlement_date::timestamp + ((settlement_period - 1) * INTERVAL '30 minutes')) BETWEEN $__timeFrom() AND $__timeTo() ORDER BY 1"
+          "rawSql": "SELECT (a.settlement_date::timestamp + ((a.settlement_period - 1) * INTERVAL '30 minutes')) AS time, SUM(a.quantity_mwh) * 2 AS \"B1610 actual\" FROM b1610 a JOIN bmu b ON b.ngc_bm_unit = a.ngc_bm_unit WHERE b.station = '$station' AND (a.settlement_date::timestamp + ((a.settlement_period - 1) * INTERVAL '30 minutes')) BETWEEN $__timeFrom() AND $__timeTo() GROUP BY 1 ORDER BY 1"
         }
       ]
     },
     {
       "id": 2,
       "type": "timeseries",
-      "title": "$bmu — SO turn-up (+) and BOA curtailment (−)",
+      "title": "$station — dispatched per BMU",
       "datasource": { "type": "postgres", "uid": "gbgrid" },
       "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "MW",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1.2,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT d.ts AS time, d.bmu AS metric, d.boa_level_mw AS value FROM bmu_dispatch d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY d.ts, d.bmu"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "$station — SO turn-up (+) and BOA curtailment (−)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
       "fieldConfig": {
         "defaults": {
           "unit": "MW",
@@ -196,7 +221,7 @@
         {
           "refId": "A",
           "format": "time_series",
-          "rawSql": "SELECT ts AS time, so_turnup_mw AS \"SO turn-up\", -boa_curtailment_mw AS \"BOA curtailment\", -so_curtailment_mw AS \"SO curtailment\" FROM bmu_dispatch WHERE bmu = '$bmu' AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY ts"
+          "rawSql": "SELECT d.ts AS time, SUM(d.so_turnup_mw) AS \"SO turn-up\", -SUM(d.boa_curtailment_mw) AS \"BOA curtailment\", -SUM(d.so_curtailment_mw) AS \"SO curtailment\" FROM bmu_dispatch d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY d.ts ORDER BY d.ts"
         }
       ]
     }
