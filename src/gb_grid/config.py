@@ -24,6 +24,7 @@ class PollConfig:
     mels_seconds: int = 300
     system_prices_seconds: int = 3600
     materialize_seconds: int = 300
+    materialize_daily_seconds: int = 1800
 
 
 POLL = PollConfig()

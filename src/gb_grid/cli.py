@@ -110,6 +110,24 @@ def materialize_dispatch_cmd(
     typer.echo(f"wrote {n} rows")
 
 
+@app.command("materialize-dispatch-daily")
+def materialize_dispatch_daily_cmd(
+    from_: Annotated[str, typer.Option("--from", help="YYYY-MM-DD inclusive")],
+    to: Annotated[str, typer.Option("--to", help="YYYY-MM-DD inclusive")],
+) -> None:
+    """Roll bmu_dispatch + b1610 up to per-BMU daily MWh totals."""
+    from .materialize import materialize_dispatch_daily
+
+    start_d = _parse_date(from_)
+    end_d = _parse_date(to)
+    conn = connect()
+    try:
+        n = materialize_dispatch_daily(conn, start_d, end_d)
+    finally:
+        conn.close()
+    typer.echo(f"wrote {n} rows")
+
+
 @app.command()
 def run() -> None:
     """Start the always-on async scheduler."""

@@ -14,7 +14,7 @@ from .ingest.fuelinst import ingest_fuelinst
 from .ingest.mels import ingest_mels
 from .ingest.pn import ingest_pn
 from .ingest.system_prices import ingest_system_prices
-from .materialize import materialize_dispatch
+from .materialize import materialize_dispatch, materialize_dispatch_daily
 
 log = structlog.get_logger(__name__)
 
@@ -109,6 +109,17 @@ def _materialize_tick() -> None:
         conn.close()
 
 
+def _materialize_daily_tick() -> None:
+    conn = connect()
+    try:
+        # Roll the trailing fortnight forward each cycle. B1610 lags ~5 working days,
+        # so older days keep getting refined as actuals trickle in.
+        today = _utcnow().date()
+        materialize_dispatch_daily(conn, today - timedelta(days=14), today)
+    finally:
+        conn.close()
+
+
 async def run_scheduler() -> None:
     log.info("scheduler_starting")
     await asyncio.gather(
@@ -119,4 +130,5 @@ async def run_scheduler() -> None:
         _loop("mels", POLL.mels_seconds, _mels_tick),
         _loop("system_prices", POLL.system_prices_seconds, _system_prices_tick),
         _loop("materialize_dispatch", POLL.materialize_seconds, _materialize_tick),
+        _loop("materialize_dispatch_daily", POLL.materialize_daily_seconds, _materialize_daily_tick),
     )

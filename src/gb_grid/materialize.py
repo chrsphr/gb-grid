@@ -116,3 +116,88 @@ def materialize_dispatch(
         end=end,
     )
     return total
+
+
+# bmu_dispatch is stored at 5-minute resolution (see PollConfig + materialize_dispatch
+# default freq). Each sample therefore represents 5/60 hours of energy.
+_DAILY_INTERVAL_HOURS = 5.0 / 60.0
+
+
+def materialize_dispatch_daily(
+    conn: psycopg.Connection,
+    start_date: Any,
+    end_date: Any,
+) -> int:
+    """Roll ``bmu_dispatch`` (and ``b1610``) up to per-BMU daily MWh totals.
+
+    Pure SQL upsert — fast enough to recompute the whole year on demand.
+    ``start_date`` and ``end_date`` are inclusive ``date`` objects.
+    """
+    sql = """
+    WITH dispatch AS (
+        SELECT bmu,
+               (ts AT TIME ZONE 'UTC')::date AS date,
+               SUM(pn_mw)              * %(h)s AS pn_mwh,
+               SUM(boa_level_mw)       * %(h)s AS boa_dispatched_mwh,
+               SUM(so_turnup_mw)       * %(h)s AS so_turnup_mwh,
+               SUM(boa_curtailment_mw) * %(h)s AS boa_curtailment_mwh,
+               SUM(so_curtailment_mw)  * %(h)s AS so_curtailment_mwh
+        FROM bmu_dispatch
+        WHERE ts >= %(start)s AND ts < %(end)s
+        GROUP BY bmu, (ts AT TIME ZONE 'UTC')::date
+    ),
+    actual AS (
+        SELECT ngc_bm_unit AS bmu,
+               settlement_date  AS date,
+               SUM(quantity_mwh) AS b1610_mwh
+        FROM b1610
+        WHERE settlement_date >= %(start_d)s AND settlement_date <= %(end_d)s
+          AND ngc_bm_unit IS NOT NULL
+        GROUP BY ngc_bm_unit, settlement_date
+    )
+    INSERT INTO bmu_dispatch_daily (
+        bmu, date, pn_mwh, boa_dispatched_mwh,
+        so_turnup_mwh, boa_curtailment_mwh, so_curtailment_mwh, b1610_mwh
+    )
+    SELECT COALESCE(d.bmu, a.bmu)              AS bmu,
+           COALESCE(d.date, a.date)            AS date,
+           d.pn_mwh, d.boa_dispatched_mwh,
+           d.so_turnup_mwh, d.boa_curtailment_mwh, d.so_curtailment_mwh,
+           a.b1610_mwh
+    FROM dispatch d
+    FULL OUTER JOIN actual a ON a.bmu = d.bmu AND a.date = d.date
+    ON CONFLICT (bmu, date) DO UPDATE SET
+        pn_mwh              = EXCLUDED.pn_mwh,
+        boa_dispatched_mwh  = EXCLUDED.boa_dispatched_mwh,
+        so_turnup_mwh       = EXCLUDED.so_turnup_mwh,
+        boa_curtailment_mwh = EXCLUDED.boa_curtailment_mwh,
+        so_curtailment_mwh  = EXCLUDED.so_curtailment_mwh,
+        b1610_mwh           = EXCLUDED.b1610_mwh
+    """
+    # bmu_dispatch is range-scanned by ts; b1610 is keyed on settlement_date.
+    # Use end-of-day on `end_date` so a full inclusive day window catches everything.
+    from datetime import datetime, time, timedelta
+
+    start_dt = datetime.combine(start_date, time.min)
+    end_dt = datetime.combine(end_date + timedelta(days=1), time.min)
+
+    with conn.cursor() as cur:
+        cur.execute(
+            sql,
+            {
+                "h": _DAILY_INTERVAL_HOURS,
+                "start": start_dt,
+                "end": end_dt,
+                "start_d": start_date,
+                "end_d": end_date,
+            },
+        )
+        n = cur.rowcount
+
+    log.info(
+        "materialize_dispatch_daily_wrote",
+        rows=n,
+        start=start_date,
+        end=end_date,
+    )
+    return n

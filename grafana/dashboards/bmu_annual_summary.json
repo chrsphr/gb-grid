@@ -1,0 +1,152 @@
+{
+  "title": "BMU annual summary",
+  "uid": "bmu-annual-summary",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": { "from": "now-90d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "fuel_type",
+        "label": "Fuel type",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "gbgrid" },
+        "query": "SELECT DISTINCT COALESCE(bmrs_fuel_type, 'UNKNOWN') AS fuel FROM bmu ORDER BY fuel",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["WIND"], "value": ["WIND"] }
+      },
+      {
+        "name": "min_mwh",
+        "label": "Min daily MWh",
+        "type": "textbox",
+        "current": { "value": "100", "text": "100" },
+        "query": "100"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "heatmap",
+      "title": "PN (MWh/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "scheme", "scheme": "Turbo", "steps": 64, "exponent": 0.5 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 1,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT d.date AS time, d.bmu AS metric, d.pn_mwh AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.bmu IN (SELECT bmu FROM bmu_dispatch_daily WHERE pn_mwh >= $min_mwh GROUP BY bmu) AND d.date BETWEEN $__timeFrom() AND $__timeTo() ORDER BY d.bmu, d.date"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "heatmap",
+      "title": "Dispatched (MWh/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "scheme", "scheme": "Turbo", "steps": 64, "exponent": 0.5 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 1,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT d.date AS time, d.bmu AS metric, d.boa_dispatched_mwh AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.bmu IN (SELECT bmu FROM bmu_dispatch_daily WHERE boa_dispatched_mwh >= $min_mwh GROUP BY bmu) AND d.date BETWEEN $__timeFrom() AND $__timeTo() ORDER BY d.bmu, d.date"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "heatmap",
+      "title": "B1610 actual (MWh/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "scheme", "scheme": "Turbo", "steps": 64, "exponent": 0.5 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 1,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT d.date AS time, d.bmu AS metric, d.b1610_mwh AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.bmu IN (SELECT bmu FROM bmu_dispatch_daily WHERE b1610_mwh >= $min_mwh GROUP BY bmu) AND d.date BETWEEN $__timeFrom() AND $__timeTo() ORDER BY d.bmu, d.date"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "heatmap",
+      "title": "SO turn-up (MWh/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 30 },
+      "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "scheme", "scheme": "Greens", "steps": 64, "exponent": 0.5 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 1,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT d.date AS time, d.bmu AS metric, d.so_turnup_mwh AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.bmu IN (SELECT bmu FROM bmu_dispatch_daily WHERE so_turnup_mwh > 0 GROUP BY bmu HAVING SUM(so_turnup_mwh) >= $min_mwh) AND d.date BETWEEN $__timeFrom() AND $__timeTo() ORDER BY d.bmu, d.date"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "heatmap",
+      "title": "BOA curtailment (MWh/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 40 },
+      "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "scheme", "scheme": "Reds", "steps": 64, "exponent": 0.5 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 1,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT d.date AS time, d.bmu AS metric, d.boa_curtailment_mwh AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.bmu IN (SELECT bmu FROM bmu_dispatch_daily WHERE boa_curtailment_mwh > 0 GROUP BY bmu HAVING SUM(boa_curtailment_mwh) >= $min_mwh) AND d.date BETWEEN $__timeFrom() AND $__timeTo() ORDER BY d.bmu, d.date"
+        }
+      ]
+    }
+  ]
+}
