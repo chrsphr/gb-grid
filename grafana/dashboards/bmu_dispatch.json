@@ -2,7 +2,7 @@
   "title": "BMU dispatch",
   "uid": "bmu-dispatch",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-24h", "to": "now" },
   "templating": {
@@ -21,11 +21,101 @@
   },
   "panels": [
     {
+      "id": 3,
+      "type": "geomap",
+      "title": "BMUs — click a marker to select",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 22, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT ngc_bm_unit, bm_unit, COALESCE(bmrs_fuel_type, 'UNKNOWN') AS fuel_type, latitude, longitude FROM bmu WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "links": [
+            {
+              "title": "Select ${__data.fields.ngc_bm_unit}",
+              "url": "/d/bmu-dispatch?var-bmu=${__data.fields.ngc_bm_unit}&${__url_time_range}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "fuel_type" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "WIND":    { "color": "#99dd55", "index": 0,  "text": "WIND" },
+                      "CCGT":    { "color": "#ee9944", "index": 1,  "text": "CCGT" },
+                      "OCGT":    { "color": "#ee9944", "index": 2,  "text": "OCGT" },
+                      "NUCLEAR": { "color": "#0099cc", "index": 3,  "text": "NUCLEAR" },
+                      "BIOMASS": { "color": "#aa3355", "index": 4,  "text": "BIOMASS" },
+                      "COAL":    { "color": "#aa3355", "index": 5,  "text": "COAL" },
+                      "NPSHYD":  { "color": "#22ccbb", "index": 6,  "text": "NPSHYD" },
+                      "PS":      { "color": "#663399", "index": 7,  "text": "PS" },
+                      "INTFR":   { "color": "#aaaaaa", "index": 8,  "text": "INTFR" },
+                      "INTBN":   { "color": "#aaaaaa", "index": 9,  "text": "INTBN" },
+                      "INTNEM":  { "color": "#aaaaaa", "index": 10, "text": "INTNEM" },
+                      "INTEW":   { "color": "#aaaaaa", "index": 11, "text": "INTEW" },
+                      "INTIRL":  { "color": "#aaaaaa", "index": 12, "text": "INTIRL" },
+                      "INTGRNL": { "color": "#aaaaaa", "index": 13, "text": "INTGRNL" },
+                      "OTHER":   { "color": "#2277cc", "index": 14, "text": "OTHER" },
+                      "UNKNOWN": { "color": "#cccccc", "index": 15, "text": "UNKNOWN" }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "view": { "id": "coords", "lat": 54.5, "lon": -3, "zoom": 5 },
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showScale": false,
+          "showMeasure": false,
+          "showDebug": false
+        },
+        "basemap": { "type": "default", "name": "Layer 0", "config": {} },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "BMUs",
+            "config": {
+              "style": {
+                "size": { "fixed": 6 },
+                "color": { "field": "fuel_type" },
+                "opacity": 0.85,
+                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" },
+                "textConfig": { "fontSize": 12, "textAlign": "center", "textBaseline": "middle" }
+              },
+              "showLegend": true
+            },
+            "location": { "mode": "coords", "latitude": "latitude", "longitude": "longitude" },
+            "tooltip": true
+          }
+        ],
+        "tooltip": { "mode": "details" }
+      }
+    },
+    {
       "id": 1,
       "type": "timeseries",
       "title": "$bmu — PN, dispatched, MEL, B1610 actual",
       "datasource": { "type": "postgres", "uid": "gbgrid" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 12, "w": 12, "x": 0, "y": 0 },
       "fieldConfig": {
         "defaults": {
           "unit": "MW",
@@ -77,7 +167,7 @@
       "type": "timeseries",
       "title": "$bmu — SO turn-up (+) and BOA curtailment (−)",
       "datasource": { "type": "postgres", "uid": "gbgrid" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
       "fieldConfig": {
         "defaults": {
           "unit": "MW",
