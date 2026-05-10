@@ -2,7 +2,7 @@
   "title": "BMU dispatch",
   "uid": "bmu-dispatch",
   "schemaVersion": 39,
-  "version": 4,
+  "version": 5,
   "refresh": "30s",
   "time": { "from": "now-24h", "to": "now" },
   "templating": {
@@ -173,8 +173,9 @@
           "unit": "MW",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 1.2,
-            "fillOpacity": 0
+            "lineWidth": 1,
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal", "group": "A" }
           }
         },
         "overrides": []

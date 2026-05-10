@@ -49,7 +49,14 @@ Editor access; admin/admin if you want to log in). It's provisioned from
 
 - `provisioning/datasources/postgres.yaml` — the local Postgres datasource (uid `gbgrid`)
 - `provisioning/dashboards/dashboards.yaml` — file provider pointing at `grafana/dashboards/`
-- `dashboards/bmu_dispatch.json` — pick a BMU from the variable to see PN, dispatched, MEL, B1610 actual, plus turn-up/curtailment
+- `dashboards/bmu_dispatch.json` — pick a station (or click one on the map) to see station-aggregate PN, dispatched, MEL and B1610, a stacked dispatched-per-BMU breakdown, and turn-up / curtailment
+
+> [!NOTE]
+> The PN / Dispatched / B1610 series on the station-total panel still need
+> work: the three are sourced from different streams (interpolated PN+BOALF
+> vs. half-hourly settlement actuals) and don't always reconcile cleanly,
+> especially around BOA acceptances and during B1610's ~5-working-day lag.
+> Treat them as a sanity check on each other, not as the same number.
 
 Backfill, then materialize, then open Grafana:
 
