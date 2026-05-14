@@ -189,6 +189,12 @@ def bmu_dispatch(
     ``boa_level_mw`` falls back to ``pn_mw`` outside any acceptance window
     (i.e. the unit is following its FPN).
     """
+    # Floor start to the freq boundary so timestamps always land on a fixed
+    # grid. Without this, each service restart shifts the offset, causing
+    # bmu_dispatch to accumulate duplicate rows at different sub-period
+    # offsets and inflating daily aggregations proportionally.
+    start = pd.Timestamp(start).floor(freq).to_pydatetime()
+
     units = list(ngc_units)
     pn = _fetch_pn(conn, units, start, end)
     boa = _fetch_boalf(conn, units, start, end)
