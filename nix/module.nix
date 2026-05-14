@@ -120,5 +120,37 @@ in {
         ReadWritePaths = [ appHome ];
       };
     };
+
+    systemd.services.gb-grid-constraints = {
+      description = "GB grid — refresh NESO day-ahead constraint flows";
+      after = [ "network-online.target" "postgresql.service" ];
+      requires = [ "postgresql.service" ];
+      wants = [ "network-online.target" ];
+
+      environment.GB_GRID_DATABASE_URL = "postgresql:///${dbName}";
+
+      serviceConfig = {
+        Type = "oneshot";
+        User = dbUser;
+        Group = dbUser;
+        WorkingDirectory = appHome;
+        ExecStart = "${gb-grid-pkg}/bin/gb-grid refresh-constraints";
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ReadWritePaths = [ appHome ];
+      };
+    };
+
+    systemd.timers.gb-grid-constraints = {
+      description = "Daily refresh of NESO day-ahead constraint flows";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        # Run at 08:00 UTC on weekdays — data is published on weekday mornings.
+        OnCalendar = "Mon-Fri 08:00 UTC";
+        # Also fire once on boot if the last run was missed (e.g. weekend).
+        Persistent = true;
+      };
+    };
   };
 }

@@ -1,5 +1,6 @@
 from .b1610 import ingest_b1610
 from .boalf import ingest_boalf
+from .constraints import ingest_constraints
 from .fuelinst import ingest_fuelinst
 from .mels import ingest_mels
 from .pn import ingest_pn
@@ -19,6 +20,7 @@ __all__ = [
     "ingest_fuelinst",
     "ingest_b1610",
     "ingest_boalf",
+    "ingest_constraints",
     "ingest_pn",
     "ingest_mels",
     "ingest_system_prices",

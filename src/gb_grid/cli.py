@@ -128,6 +128,19 @@ def materialize_dispatch_daily_cmd(
     typer.echo(f"wrote {n} rows")
 
 
+@app.command("refresh-constraints")
+def refresh_constraints_cmd() -> None:
+    """Download and upsert the NESO day-ahead constraint flows CSV."""
+    from .ingest.constraints import ingest_constraints
+
+    conn = connect()
+    try:
+        n = ingest_constraints(conn)
+    finally:
+        conn.close()
+    typer.echo(f"wrote {n} rows")
+
+
 @app.command()
 def run() -> None:
     """Start the always-on async scheduler."""

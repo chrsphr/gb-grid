@@ -1,0 +1,114 @@
+{
+  "title": "Day-ahead constraint flows and limits",
+  "uid": "constraints",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1h",
+  "time": { "from": "now-30d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "constraint_group",
+        "label": "Constraint group",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "gbgrid" },
+        "query": "SELECT label AS __text, cg AS __value FROM (VALUES (1,'ERROEX','ERROEX'),(2,'B2 — SSEN-S','SSEN-S'),(3,'B4 — SSE-SP2','SSE-SP2'),(4,'B5 — NKILGRMO','NKILGRMO'),(5,'GALLEX','GALLEX'),(6,'B6 — SCOTEX','SCOTEX'),(7,'SSE-SP','SSE-SP'),(8,'FLOWSTH','FLOWSTH'),(9,'HARSPNBLY','HARSPNBLY'),(10,'B7 — SSHARN','SSHARN'),(11,'B7 — SSHARN3','SSHARN3'),(12,'SSHARN7','SSHARN7'),(13,'SHARN','SHARN'),(14,'SPANOREX','SPANOREX'),(15,'GM+SNOW5A','GM+SNOW5A'),(16,'GETEX','GETEX'),(17,'BRASIZEX','BRASIZEX'),(18,'SW1 — SWALEX','SWALEX'),(19,'SEIMP','SEIMP'),(20,'LE1 — SEIMPPR21','SEIMPPR21'),(21,'LE1 — SEIMPPR23','SEIMPPR23'),(22,'LE1 — SEIMPPR33','SEIMPPR33'),(23,'B15 — ESTEX','ESTEX')) AS t(ord,label,cg) WHERE cg IN (SELECT DISTINCT constraint_group FROM constraints WHERE ts BETWEEN to_timestamp($__from::bigint/1000) AND to_timestamp($__to::bigint/1000)) ORDER BY ord",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "${constraint_group:text}",
+      "repeat": "constraint_group",
+      "repeatDirection": "v",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "megwatt",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Daily Max" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 0 },
+              { "id": "custom.fillBelowTo", "value": "Daily Min" },
+              { "id": "custom.fillOpacity", "value": 20 },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Daily Min" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 0 },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "24h Avg" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "dark-blue" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Flow" },
+            "properties": [
+              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Limit" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT ts AS time, 'Flow' AS metric, flow_mw AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawSql": "SELECT ts AS time, '24h Avg' AS metric, AVG(flow_mw) OVER (ORDER BY ts ROWS BETWEEN 47 PRECEDING AND CURRENT ROW) AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time"
+        },
+        {
+          "refId": "C",
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', ts) AS time, 'Daily Max' AS metric, MAX(flow_mw) AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY 1 ORDER BY 1"
+        },
+        {
+          "refId": "D",
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', ts) AS time, 'Daily Min' AS metric, MIN(flow_mw) AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY 1 ORDER BY 1"
+        },
+        {
+          "refId": "E",
+          "format": "time_series",
+          "rawSql": "SELECT ts AS time, 'Limit' AS metric, limit_mw AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time"
+        }
+      ]
+    }
+  ]
+}
