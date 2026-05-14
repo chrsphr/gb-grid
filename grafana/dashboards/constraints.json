@@ -96,12 +96,12 @@
         {
           "refId": "C",
           "format": "time_series",
-          "rawSql": "SELECT date_trunc('day', ts) AS time, 'Daily Max' AS metric, MAX(flow_mw) AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY 1 ORDER BY 1"
+          "rawSql": "SELECT ts AS time, 'Daily Max' AS metric, MAX(flow_mw) OVER (PARTITION BY date_trunc('day', ts)) AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time"
         },
         {
           "refId": "D",
           "format": "time_series",
-          "rawSql": "SELECT date_trunc('day', ts) AS time, 'Daily Min' AS metric, MIN(flow_mw) AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY 1 ORDER BY 1"
+          "rawSql": "SELECT ts AS time, 'Daily Min' AS metric, MIN(flow_mw) OVER (PARTITION BY date_trunc('day', ts)) AS value FROM constraints WHERE constraint_group IN (${constraint_group:singlequote}) AND ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY time"
         },
         {
           "refId": "E",
