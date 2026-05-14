@@ -131,7 +131,7 @@
       "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
       "options": {
         "calculate": false,
-        "color": { "mode": "scheme", "scheme": "Oranges", "steps": 64, "exponent": 0.5 },
+        "color": { "mode": "opacity", "fill": "#FF9900", "steps": 64, "exponent": 0.5, "reverse": true },
         "yAxis": { "axisPlacement": "left", "reverse": false },
         "cellGap": 2,
         "legend": { "show": true },
@@ -155,7 +155,7 @@
       "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
       "options": {
         "calculate": false,
-        "color": { "mode": "scheme", "scheme": "Oranges", "steps": 64, "exponent": 0.5 },
+        "color": { "mode": "opacity", "fill": "#FF9900", "steps": 64, "exponent": 0.5, "reverse": true },
         "yAxis": { "axisPlacement": "left", "reverse": false },
         "cellGap": 2,
         "legend": { "show": true },
@@ -179,7 +179,7 @@
       "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
       "options": {
         "calculate": false,
-        "color": { "mode": "scheme", "scheme": "Oranges", "steps": 64, "exponent": 0.5 },
+        "color": { "mode": "opacity", "fill": "#FF9900", "steps": 64, "exponent": 0.5, "reverse": true },
         "yAxis": { "axisPlacement": "left", "reverse": false },
         "cellGap": 2,
         "legend": { "show": true },
@@ -203,7 +203,7 @@
       "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
       "options": {
         "calculate": false,
-        "color": { "mode": "scheme", "scheme": "Greens", "steps": 64, "exponent": 0.5 },
+        "color": { "mode": "opacity", "fill": "#73BF69", "steps": 64, "exponent": 0.5, "reverse": true },
         "yAxis": { "axisPlacement": "left", "reverse": false },
         "cellGap": 2,
         "legend": { "show": true },
@@ -227,7 +227,7 @@
       "fieldConfig": { "defaults": { "unit": "MWh", "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
       "options": {
         "calculate": false,
-        "color": { "mode": "scheme", "scheme": "Reds", "steps": 64, "exponent": 0.5 },
+        "color": { "mode": "opacity", "fill": "#F2495C", "steps": 64, "exponent": 0.5, "reverse": true },
         "yAxis": { "axisPlacement": "left", "reverse": false },
         "cellGap": 2,
         "legend": { "show": true },
