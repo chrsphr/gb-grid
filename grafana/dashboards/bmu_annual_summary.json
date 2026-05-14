@@ -73,14 +73,14 @@
                       "BIOMASS": { "color": "#aa3355", "index": 4,  "text": "BIOMASS" },
                       "COAL":    { "color": "#aa3355", "index": 5,  "text": "COAL" },
                       "NPSHYD":  { "color": "#22ccbb", "index": 6,  "text": "NPSHYD" },
-                      "PS":      { "color": "#663399", "index": 7,  "text": "PS" },
+                      "PS":      { "color": "#00b0bd", "index": 7,  "text": "PS" },
                       "INTFR":   { "color": "#aaaaaa", "index": 8,  "text": "INTFR" },
                       "INTBN":   { "color": "#aaaaaa", "index": 9,  "text": "INTBN" },
                       "INTNEM":  { "color": "#aaaaaa", "index": 10, "text": "INTNEM" },
                       "INTEW":   { "color": "#aaaaaa", "index": 11, "text": "INTEW" },
                       "INTIRL":  { "color": "#aaaaaa", "index": 12, "text": "INTIRL" },
                       "INTGRNL": { "color": "#aaaaaa", "index": 13, "text": "INTGRNL" },
-                      "OTHER":   { "color": "#2277cc", "index": 14, "text": "OTHER" },
+                      "OTHER":   { "color": "#9400FF", "index": 14, "text": "OTHER" },
                       "UNKNOWN": { "color": "#cccccc", "index": 15, "text": "UNKNOWN" }
                     }
                   }
