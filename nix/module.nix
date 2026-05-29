@@ -64,6 +64,7 @@ in {
           reporting_enabled = false;
           check_for_updates = false;
         };
+        security.secret_key = "SW2YcwTIb9zpOOhoPsMm";
       };
       provision = {
         enable = true;
