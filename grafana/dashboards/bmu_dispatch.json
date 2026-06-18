@@ -158,7 +158,7 @@
         {
           "refId": "B",
           "format": "time_series",
-          "rawSql": "SELECT (a.settlement_date::timestamp + ((a.settlement_period - 1) * INTERVAL '30 minutes')) AS time, SUM(a.quantity_mwh) * 2 AS \"B1610 actual\" FROM b1610 a JOIN bmu b ON b.ngc_bm_unit = a.ngc_bm_unit WHERE b.station = '$station' AND (a.settlement_date::timestamp + ((a.settlement_period - 1) * INTERVAL '30 minutes')) BETWEEN $__timeFrom() AND $__timeTo() GROUP BY 1 ORDER BY 1"
+          "rawSql": "SELECT bucket_ts AS time, b1610_mw AS \"B1610 actual\" FROM b1610_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) ORDER BY bucket_ts"
         }
       ]
     },
