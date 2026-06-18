@@ -1,0 +1,1139 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "MW",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "showPoints": "never",
+            "lineInterpolation": "linear",
+            "axisColorMode": "text"
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "WIND"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#99dd55"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CCGT"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ee9944"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OCGT"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#ee9944"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "NUCLEAR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#0099cc"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BIOMASS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aa3355"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "COAL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aa3355"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "NPSHYD"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#22ccbb"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#00b0bd"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OTHER"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9400FF"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OIL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#666666"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTELEC"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTEW"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTFR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTGRNL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTIFA2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTIRL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTNED"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTNEM"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTNSL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "INTVKL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#aaaaaa"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "refId": "A",
+          "rawSql": "SELECT publish_time AS time, fuel_type AS metric, generation_mw AS value FROM fuelinst WHERE publish_time >= $__timeFrom() AND publish_time < $__timeTo() ORDER BY time, metric"
+        }
+      ],
+      "title": "National generation by fuel type (fuelinst)",
+      "type": "timeseries"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "WIND \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 2,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-greens"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 70,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 3,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'WIND' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station), cap AS (SELECT b.station AS station, SUM(m.cap) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'WIND' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL GROUP BY b.station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(100.0 * SUM(h.b1610_mwh * 2) / NULLIF(c.cap,0), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN cap c ON c.station = b.station JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'WIND' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, c.cap, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "CCGT \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "id": 4,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      },
+      "id": 5,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'CCGT' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station), cap AS (SELECT b.station AS station, SUM(m.cap) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'CCGT' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL GROUP BY b.station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(100.0 * SUM(h.b1610_mwh * 2) / NULLIF(c.cap,0), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN cap c ON c.station = b.station JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'CCGT' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, c.cap, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "OCGT \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 97
+      },
+      "id": 6,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 98
+      },
+      "id": 7,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'OCGT' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station), cap AS (SELECT b.station AS station, SUM(m.cap) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'OCGT' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL GROUP BY b.station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(100.0 * SUM(h.b1610_mwh * 2) / NULLIF(c.cap,0), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN cap c ON c.station = b.station JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'OCGT' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, c.cap, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "NUCLEAR \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 106
+      },
+      "id": 8,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-blues"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 107
+      },
+      "id": 9,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'NUCLEAR' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station), cap AS (SELECT b.station AS station, SUM(m.cap) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'NUCLEAR' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL GROUP BY b.station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(100.0 * SUM(h.b1610_mwh * 2) / NULLIF(c.cap,0), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN cap c ON c.station = b.station JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'NUCLEAR' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, c.cap, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "BIOMASS \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 111
+      },
+      "id": 10,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-reds"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 112
+      },
+      "id": 11,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'BIOMASS' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station), cap AS (SELECT b.station AS station, SUM(m.cap) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'BIOMASS' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL GROUP BY b.station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(100.0 * SUM(h.b1610_mwh * 2) / NULLIF(c.cap,0), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN cap c ON c.station = b.station JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'BIOMASS' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, c.cap, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "NPSHYD \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 116
+      },
+      "id": 12,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-blues"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 117
+      },
+      "id": 13,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'NPSHYD' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station), cap AS (SELECT b.station AS station, SUM(m.cap) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'NPSHYD' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL GROUP BY b.station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(100.0 * SUM(h.b1610_mwh * 2) / NULLIF(c.cap,0), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN cap c ON c.station = b.station JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'NPSHYD' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, c.cap, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "PS \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 123
+      },
+      "id": 14,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "MW",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 124
+      },
+      "id": 15,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'PS' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(SUM(h.b1610_mwh * 2), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'PS' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "INTEW \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 128
+      },
+      "id": 16,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "MW",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 129
+      },
+      "id": 17,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'INTEW' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(SUM(h.b1610_mwh * 2), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'INTEW' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "OTHER \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 133
+      },
+      "id": 18,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "gbgrid"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "custom": {
+            "fillOpacity": 100,
+            "lineWidth": 0,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false
+          },
+          "mappings": [],
+          "unit": "MW",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 19,
+        "w": 24,
+        "x": 0,
+        "y": 134
+      },
+      "id": 19,
+      "options": {
+        "alignValue": "left",
+        "colWidth": 0.95,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "WITH ns AS (SELECT station, row_number() OVER (ORDER BY AVG(latitude) DESC) AS rnk FROM bmu WHERE COALESCE(bmrs_fuel_type,'UNKNOWN') = 'OTHER' AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station) SELECT (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) AS time, lpad(ns.rnk::text,3,'0') || ' ' || b.station AS metric, NULLIF(SUM(h.b1610_mwh * 2), 0) AS value FROM b1610_hh_cagg h JOIN bmu b ON b.ngc_bm_unit = h.bmu JOIN ns ON ns.station = b.station WHERE COALESCE(b.bmrs_fuel_type,'UNKNOWN') = 'OTHER' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL AND h.bucket >= $__timeFrom()::date AND h.bucket <= $__timeTo()::date AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) >= $__timeFrom() AND (h.bucket::timestamp + ((h.settlement_period - 1) * interval '30 min')) < $__timeTo() GROUP BY time, b.station, ns.rnk ORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "status-history"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "2026-05-01T00:00:00.000Z",
+    "to": "2026-05-08T00:00:00.000Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "BMU output heatmap",
+  "uid": "bmu-heatmap",
+  "version": 1
+}
