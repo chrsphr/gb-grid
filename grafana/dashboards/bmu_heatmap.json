@@ -379,6 +379,19 @@
       "type": "timeseries"
     },
     {
+      "type": "row",
+      "collapsed": false,
+      "title": "WIND \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 2,
+      "panels": []
+    },
+    {
       "datasource": {
         "type": "postgres",
         "uid": "gbgrid"
@@ -415,12 +428,12 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 40,
+        "h": 70,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 10
       },
-      "id": 2,
+      "id": 3,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -445,8 +458,21 @@
           "refId": "A"
         }
       ],
-      "title": "WIND \u2014 load factor (% of MEL capacity)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "CCGT \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "id": 4,
+      "panels": []
     },
     {
       "datasource": {
@@ -488,9 +514,9 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 81
       },
-      "id": 3,
+      "id": 5,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -515,8 +541,21 @@
           "refId": "A"
         }
       ],
-      "title": "CCGT \u2014 load factor (% of MEL capacity)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "OCGT \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 97
+      },
+      "id": 6,
+      "panels": []
     },
     {
       "datasource": {
@@ -558,9 +597,9 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 98
       },
-      "id": 4,
+      "id": 7,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -585,8 +624,21 @@
           "refId": "A"
         }
       ],
-      "title": "OCGT \u2014 load factor (% of MEL capacity)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "NUCLEAR \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 106
+      },
+      "id": 8,
+      "panels": []
     },
     {
       "datasource": {
@@ -628,9 +680,9 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 107
       },
-      "id": 5,
+      "id": 9,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -655,8 +707,21 @@
           "refId": "A"
         }
       ],
-      "title": "NUCLEAR \u2014 load factor (% of MEL capacity)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "BIOMASS \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 111
+      },
+      "id": 10,
+      "panels": []
     },
     {
       "datasource": {
@@ -698,9 +763,9 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 112
       },
-      "id": 6,
+      "id": 11,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -725,8 +790,21 @@
           "refId": "A"
         }
       ],
-      "title": "BIOMASS \u2014 load factor (% of MEL capacity)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "NPSHYD \u2014 load factor (% of MEL capacity)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 116
+      },
+      "id": 12,
+      "panels": []
     },
     {
       "datasource": {
@@ -768,9 +846,9 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 81
+        "y": 117
       },
-      "id": 7,
+      "id": 13,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -795,8 +873,21 @@
           "refId": "A"
         }
       ],
-      "title": "NPSHYD \u2014 load factor (% of MEL capacity)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "PS \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 123
+      },
+      "id": 14,
+      "panels": []
     },
     {
       "datasource": {
@@ -836,9 +927,9 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 87
+        "y": 124
       },
-      "id": 8,
+      "id": 15,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -863,8 +954,21 @@
           "refId": "A"
         }
       ],
-      "title": "PS \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "INTEW \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 128
+      },
+      "id": 16,
+      "panels": []
     },
     {
       "datasource": {
@@ -904,9 +1008,9 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 91
+        "y": 129
       },
-      "id": 9,
+      "id": 17,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -931,8 +1035,21 @@
           "refId": "A"
         }
       ],
-      "title": "INTEW \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "title": "",
       "type": "status-history"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "title": "OTHER \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 133
+      },
+      "id": 18,
+      "panels": []
     },
     {
       "datasource": {
@@ -972,9 +1089,9 @@
         "h": 19,
         "w": 24,
         "x": 0,
-        "y": 95
+        "y": 134
       },
-      "id": 10,
+      "id": 19,
       "options": {
         "alignValue": "left",
         "colWidth": 0.95,
@@ -999,7 +1116,7 @@
           "refId": "A"
         }
       ],
-      "title": "OTHER \u2014 net output (\u2212 import/charge, + export/discharge)",
+      "title": "",
       "type": "status-history"
     }
   ],
