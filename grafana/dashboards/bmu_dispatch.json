@@ -1,230 +1,959 @@
 {
-  "title": "BMU dispatch",
-  "uid": "bmu-dispatch",
-  "schemaVersion": 39,
-  "version": 6,
-  "refresh": "30s",
-  "time": { "from": "now-24h", "to": "now" },
-  "templating": {
-    "list": [
-      {
-        "name": "station",
-        "label": "Station",
-        "type": "query",
-        "datasource": { "type": "postgres", "uid": "gbgrid" },
-        "query": "SELECT DISTINCT b.station FROM bmu b JOIN bmu_dispatch d ON d.bmu = b.ngc_bm_unit ORDER BY 1",
-        "refresh": 1,
-        "includeAll": false,
-        "multi": false
-      }
-    ]
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "bmu-dispatch",
+    "namespace": "default",
+    "uid": "b96b4f55-2b8f-491f-88d2-9c8ef3b8160b",
+    "resourceVersion": "1781803281177011",
+    "generation": 1,
+    "creationTimestamp": "2026-06-18T17:21:21Z",
+    "labels": {
+      "grafana.app/deprecatedInternalID": "506710946086912"
+    },
+    "annotations": {
+      "grafana.app/createdBy": "access-policy:service",
+      "grafana.app/managedBy": "classic-file-provisioning",
+      "grafana.app/managerId": "gb-grid",
+      "grafana.app/sourceChecksum": "8dff5e614a3cb04336ea86e5e561d4c4",
+      "grafana.app/sourcePath": "/nix/store/ixy3p8b0kykd23ivngpy4c6nsyapbppa-dashboards/bmu_dispatch.json",
+      "grafana.app/sourceTimestamp": "1000",
+      "grafana.app/folder": ""
+    }
   },
-  "panels": [
-    {
-      "id": 3,
-      "type": "geomap",
-      "title": "Stations — click to select",
-      "datasource": { "type": "postgres", "uid": "gbgrid" },
-      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 0 },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawSql": "SELECT station, AVG(latitude) AS latitude, AVG(longitude) AS longitude, MODE() WITHIN GROUP (ORDER BY COALESCE(bmrs_fuel_type, 'UNKNOWN')) AS fuel_type, COUNT(*) AS bmus FROM bmu WHERE latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station"
+  "spec": {
+    "annotations": [
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "builtIn": true,
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "query": {
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "group": "grafana",
+            "kind": "DataQuery",
+            "spec": {},
+            "version": "v0"
+          }
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "links": [
-            {
-              "title": "Select ${__data.fields.station}",
-              "url": "/d/bmu-dispatch?var-station=${__data.fields.station}&${__url_time_range}",
-              "targetBlank": false
+      }
+    ],
+    "cursorSync": "Off",
+    "editable": true,
+    "elements": {
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "gbgrid"
+                      },
+                      "group": "postgres",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "time_series",
+                        "rawSql": "SELECT bucket_ts AS time, SUM(pn_mw) AS \"PN\", SUM(boa_level_mw) AS \"Dispatched\", SUM(mel_mw) AS \"MEL\" FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) GROUP BY bucket_ts ORDER BY bucket_ts"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "gbgrid"
+                      },
+                      "group": "postgres",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "time_series",
+                        "rawSql": "SELECT bucket_ts AS time, b1610_mw AS \"B1610 actual\" FROM b1610_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) ORDER BY bucket_ts"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "B"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
             }
-          ]
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "fuel_type" },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "WIND":    { "color": "#99dd55", "index": 0,  "text": "WIND" },
-                      "CCGT":    { "color": "#ee9944", "index": 1,  "text": "CCGT" },
-                      "OCGT":    { "color": "#ee9944", "index": 2,  "text": "OCGT" },
-                      "NUCLEAR": { "color": "#0099cc", "index": 3,  "text": "NUCLEAR" },
-                      "BIOMASS": { "color": "#aa3355", "index": 4,  "text": "BIOMASS" },
-                      "COAL":    { "color": "#aa3355", "index": 5,  "text": "COAL" },
-                      "NPSHYD":  { "color": "#22ccbb", "index": 6,  "text": "NPSHYD" },
-                      "PS":      { "color": "#00b0bd", "index": 7,  "text": "PS" },
-                      "INTFR":   { "color": "#aaaaaa", "index": 8,  "text": "INTFR" },
-                      "INTBN":   { "color": "#aaaaaa", "index": 9,  "text": "INTBN" },
-                      "INTNEM":  { "color": "#aaaaaa", "index": 10, "text": "INTNEM" },
-                      "INTEW":   { "color": "#aaaaaa", "index": 11, "text": "INTEW" },
-                      "INTIRL":  { "color": "#aaaaaa", "index": 12, "text": "INTIRL" },
-                      "INTGRNL": { "color": "#aaaaaa", "index": 13, "text": "INTGRNL" },
-                      "OTHER":   { "color": "#9400FF", "index": 14, "text": "OTHER" },
-                      "UNKNOWN": { "color": "#cccccc", "index": 15, "text": "UNKNOWN" }
+          },
+          "description": "",
+          "id": 1,
+          "links": [],
+          "title": "$station — station total (PN, dispatched, MEL, B1610)",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1.5,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
                     }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "MW"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "MEL"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.lineStyle",
+                        "value": {
+                          "dash": [
+                            10,
+                            10
+                          ],
+                          "fill": "dash"
+                        }
+                      },
+                      {
+                        "id": "custom.lineWidth",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Dispatched"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "gray",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "B1610 actual"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "black",
+                          "mode": "fixed"
+                        }
+                      },
+                      {
+                        "id": "custom.lineWidth",
+                        "value": 2.5
+                      },
+                      {
+                        "id": "custom.lineInterpolation",
+                        "value": "stepAfter"
+                      }
+                    ]
                   }
                 ]
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "view": { "id": "coords", "lat": 54.5, "lon": -3, "zoom": 5 },
-        "controls": {
-          "showZoom": true,
-          "mouseWheelZoom": true,
-          "showAttribution": true,
-          "showScale": false,
-          "showMeasure": false,
-          "showDebug": false
-        },
-        "basemap": { "type": "default", "name": "Layer 0", "config": {} },
-        "layers": [
-          {
-            "type": "markers",
-            "name": "Stations",
-            "config": {
-              "style": {
-                "size": { "fixed": 7 },
-                "color": { "field": "fuel_type" },
-                "opacity": 0.85,
-                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" },
-                "textConfig": { "fontSize": 12, "textAlign": "center", "textBaseline": "middle" }
               },
-              "showLegend": true
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              }
             },
-            "location": { "mode": "coords", "latitude": "latitude", "longitude": "longitude" },
-            "tooltip": true
+            "version": "13.0.2"
           }
-        ],
-        "tooltip": { "mode": "details" }
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "gbgrid"
+                      },
+                      "group": "postgres",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "time_series",
+                        "rawSql": "SELECT bucket_ts AS time, bmu AS metric, boa_level_mw AS value FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) ORDER BY bucket_ts, bmu"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "",
+          "id": 2,
+          "links": [],
+          "title": "$station — dispatched per BMU",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 50,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "normal"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "MW"
+                },
+                "overrides": []
+              },
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              }
+            },
+            "version": "13.0.2"
+          }
+        }
+      },
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "gbgrid"
+                      },
+                      "group": "postgres",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "table",
+                        "rawSql": "SELECT station, AVG(latitude) AS latitude, AVG(longitude) AS longitude, MODE() WITHIN GROUP (ORDER BY COALESCE(bmrs_fuel_type, 'UNKNOWN')) AS fuel_type, COUNT(*) AS bmus FROM bmu WHERE latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "",
+          "id": 3,
+          "links": [],
+          "title": "Stations — click to select",
+          "vizConfig": {
+            "group": "geomap",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  },
+                  "links": [
+                    {
+                      "targetBlank": false,
+                      "title": "Select ${__data.fields.station}",
+                      "url": "/d/bmu-dispatch?var-station=${__data.fields.station}&${__url_time_range}"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "fuel_type"
+                    },
+                    "properties": [
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "BIOMASS": {
+                                "color": "#aa3355",
+                                "index": 4,
+                                "text": "BIOMASS"
+                              },
+                              "CCGT": {
+                                "color": "#ee9944",
+                                "index": 1,
+                                "text": "CCGT"
+                              },
+                              "COAL": {
+                                "color": "#aa3355",
+                                "index": 5,
+                                "text": "COAL"
+                              },
+                              "INTBN": {
+                                "color": "#aaaaaa",
+                                "index": 9,
+                                "text": "INTBN"
+                              },
+                              "INTEW": {
+                                "color": "#aaaaaa",
+                                "index": 11,
+                                "text": "INTEW"
+                              },
+                              "INTFR": {
+                                "color": "#aaaaaa",
+                                "index": 8,
+                                "text": "INTFR"
+                              },
+                              "INTGRNL": {
+                                "color": "#aaaaaa",
+                                "index": 13,
+                                "text": "INTGRNL"
+                              },
+                              "INTIRL": {
+                                "color": "#aaaaaa",
+                                "index": 12,
+                                "text": "INTIRL"
+                              },
+                              "INTNEM": {
+                                "color": "#aaaaaa",
+                                "index": 10,
+                                "text": "INTNEM"
+                              },
+                              "NPSHYD": {
+                                "color": "#22ccbb",
+                                "index": 6,
+                                "text": "NPSHYD"
+                              },
+                              "NUCLEAR": {
+                                "color": "#0099cc",
+                                "index": 3,
+                                "text": "NUCLEAR"
+                              },
+                              "OCGT": {
+                                "color": "#ee9944",
+                                "index": 2,
+                                "text": "OCGT"
+                              },
+                              "OTHER": {
+                                "color": "#9400FF",
+                                "index": 14,
+                                "text": "OTHER"
+                              },
+                              "PS": {
+                                "color": "#00b0bd",
+                                "index": 7,
+                                "text": "PS"
+                              },
+                              "UNKNOWN": {
+                                "color": "#cccccc",
+                                "index": 15,
+                                "text": "UNKNOWN"
+                              },
+                              "WIND": {
+                                "color": "#99dd55",
+                                "index": 0,
+                                "text": "WIND"
+                              }
+                            },
+                            "type": "value"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "basemap": {
+                  "config": {},
+                  "name": "Layer 0",
+                  "type": "default"
+                },
+                "controls": {
+                  "mouseWheelZoom": true,
+                  "showAttribution": true,
+                  "showDebug": false,
+                  "showMeasure": false,
+                  "showScale": false,
+                  "showZoom": true
+                },
+                "layers": [
+                  {
+                    "config": {
+                      "showLegend": true,
+                      "style": {
+                        "color": {
+                          "field": "fuel_type"
+                        },
+                        "opacity": 0.85,
+                        "size": {
+                          "fixed": 7
+                        },
+                        "symbol": {
+                          "fixed": "img/icons/marker/circle.svg",
+                          "mode": "fixed"
+                        },
+                        "textConfig": {
+                          "fontSize": 12,
+                          "textAlign": "center",
+                          "textBaseline": "middle"
+                        }
+                      }
+                    },
+                    "location": {
+                      "latitude": "latitude",
+                      "longitude": "longitude",
+                      "mode": "coords"
+                    },
+                    "name": "Stations",
+                    "tooltip": true,
+                    "type": "markers"
+                  }
+                ],
+                "tooltip": {
+                  "mode": "details"
+                },
+                "view": {
+                  "allLayers": true,
+                  "dashboardVariable": false,
+                  "id": "coords",
+                  "lat": 54.5,
+                  "lon": -3,
+                  "noRepeat": false,
+                  "zoom": 5
+                }
+              }
+            },
+            "version": "13.0.2"
+          }
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "gbgrid"
+                      },
+                      "group": "postgres",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "time_series",
+                        "rawSql": "SELECT bucket_ts AS time, SUM(so_turnup_mw) AS \"SO turn-up\", -SUM(boa_curtailment_mw) AS \"BOA curtailment\", -SUM(so_curtailment_mw) AS \"SO curtailment\" FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) GROUP BY bucket_ts ORDER BY bucket_ts"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "",
+          "id": 4,
+          "links": [],
+          "title": "$station — SO turn-up (+) and BOA curtailment (−)",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 40,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  },
+                  "unit": "MW"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "SO turn-up"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "green",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "BOA curtailment"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "red",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "SO curtailment"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "orange",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              }
+            },
+            "version": "13.0.2"
+          }
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "data": { "kind": "QueryGroup", "spec": { "queries": [ { "kind": "PanelQuery", "spec": { "hidden": false, "query": { "datasource": { "name": "gbgrid" }, "group": "postgres", "kind": "DataQuery", "spec": { "format": "table", "rawSql": "SELECT SUM(d.pn_mwh) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.date BETWEEN $__timeFrom() AND $__timeTo()" }, "version": "v0" }, "refId": "A" } } ], "queryOptions": {}, "transformations": [] } },
+          "description": "", "id": 5, "links": [], "title": "Total PN",
+          "vizConfig": { "group": "stat", "kind": "VizConfig", "spec": { "fieldConfig": { "defaults": { "unit": "MWh", "color": { "mode": "fixed", "fixedColor": "blue" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": 0 } ] } }, "overrides": [] }, "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true }, "version": "13.0.2" } }
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "data": { "kind": "QueryGroup", "spec": { "queries": [ { "kind": "PanelQuery", "spec": { "hidden": false, "query": { "datasource": { "name": "gbgrid" }, "group": "postgres", "kind": "DataQuery", "spec": { "format": "table", "rawSql": "SELECT SUM(d.b1610_mwh) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.date BETWEEN $__timeFrom() AND $__timeTo()" }, "version": "v0" }, "refId": "A" } } ], "queryOptions": {}, "transformations": [] } },
+          "description": "", "id": 6, "links": [], "title": "Total B1610",
+          "vizConfig": { "group": "stat", "kind": "VizConfig", "spec": { "fieldConfig": { "defaults": { "unit": "MWh", "color": { "mode": "fixed", "fixedColor": "dark-grey" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [ { "color": "dark-grey", "value": 0 } ] } }, "overrides": [] }, "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true }, "version": "13.0.2" } }
+        }
+      },
+      "panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "data": { "kind": "QueryGroup", "spec": { "queries": [ { "kind": "PanelQuery", "spec": { "hidden": false, "query": { "datasource": { "name": "gbgrid" }, "group": "postgres", "kind": "DataQuery", "spec": { "format": "table", "rawSql": "SELECT SUM(d.pn_mwh) - SUM(COALESCE(d.b1610_mwh, 0)) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.date BETWEEN $__timeFrom() AND $__timeTo()" }, "version": "v0" }, "refId": "A" } } ], "queryOptions": {}, "transformations": [] } },
+          "description": "", "id": 7, "links": [], "title": "PN − B1610",
+          "vizConfig": { "group": "stat", "kind": "VizConfig", "spec": { "fieldConfig": { "defaults": { "unit": "MWh", "color": { "mode": "fixed", "fixedColor": "purple" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [ { "color": "purple", "value": 0 } ] } }, "overrides": [] }, "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true }, "version": "13.0.2" } }
+        }
+      },
+      "panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "data": { "kind": "QueryGroup", "spec": { "queries": [ { "kind": "PanelQuery", "spec": { "hidden": false, "query": { "datasource": { "name": "gbgrid" }, "group": "postgres", "kind": "DataQuery", "spec": { "format": "table", "rawSql": "SELECT SUM(d.so_turnup_mwh) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.date BETWEEN $__timeFrom() AND $__timeTo()" }, "version": "v0" }, "refId": "A" } } ], "queryOptions": {}, "transformations": [] } },
+          "description": "", "id": 8, "links": [], "title": "Total turn-up",
+          "vizConfig": { "group": "stat", "kind": "VizConfig", "spec": { "fieldConfig": { "defaults": { "unit": "MWh", "color": { "mode": "fixed", "fixedColor": "green" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] } }, "overrides": [] }, "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true }, "version": "13.0.2" } }
+        }
+      },
+      "panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "data": { "kind": "QueryGroup", "spec": { "queries": [ { "kind": "PanelQuery", "spec": { "hidden": false, "query": { "datasource": { "name": "gbgrid" }, "group": "postgres", "kind": "DataQuery", "spec": { "format": "table", "rawSql": "SELECT SUM(d.boa_curtailment_mwh) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.date BETWEEN $__timeFrom() AND $__timeTo()" }, "version": "v0" }, "refId": "A" } } ], "queryOptions": {}, "transformations": [] } },
+          "description": "", "id": 9, "links": [], "title": "Total turn-down",
+          "vizConfig": { "group": "stat", "kind": "VizConfig", "spec": { "fieldConfig": { "defaults": { "unit": "MWh", "color": { "mode": "fixed", "fixedColor": "red" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": 0 } ] } }, "overrides": [] }, "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true }, "version": "13.0.2" } }
+        }
       }
     },
-    {
-      "id": 1,
-      "type": "timeseries",
-      "title": "$station — station total (PN, dispatched, MEL, B1610)",
-      "datasource": { "type": "postgres", "uid": "gbgrid" },
-      "gridPos": { "h": 12, "w": 12, "x": 0, "y": 0 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "MW",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1.5,
-            "fillOpacity": 0
-          }
-        },
-        "overrides": [
+    "layout": {
+      "kind": "GridLayout",
+      "spec": {
+        "items": [
           {
-            "matcher": { "id": "byName", "options": "MEL" },
-            "properties": [
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
-              { "id": "custom.lineWidth", "value": 1 }
-            ]
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-3"
+              },
+              "height": 14,
+              "width": 9,
+              "x": 0,
+              "y": 0
+            }
           },
           {
-            "matcher": { "id": "byName", "options": "Dispatched" },
-            "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "gray" } }
-            ]
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-1"
+              },
+              "height": 14,
+              "width": 15,
+              "x": 9,
+              "y": 0
+            }
           },
           {
-            "matcher": { "id": "byName", "options": "B1610 actual" },
-            "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "black" } },
-              { "id": "custom.lineWidth", "value": 2.5 },
-              { "id": "custom.lineInterpolation", "value": "stepAfter" }
-            ]
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-2"
+              },
+              "height": 10,
+              "width": 15,
+              "x": 9,
+              "y": 14
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-4"
+              },
+              "height": 11,
+              "width": 15,
+              "x": 9,
+              "y": 24
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": { "kind": "ElementReference", "name": "panel-5" },
+              "height": 6, "width": 3, "x": 9, "y": 35
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": { "kind": "ElementReference", "name": "panel-6" },
+              "height": 6, "width": 3, "x": 12, "y": 35
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": { "kind": "ElementReference", "name": "panel-7" },
+              "height": 6, "width": 3, "x": 15, "y": 35
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": { "kind": "ElementReference", "name": "panel-8" },
+              "height": 6, "width": 3, "x": 18, "y": 35
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": { "kind": "ElementReference", "name": "panel-9" },
+              "height": 6, "width": 3, "x": 21, "y": 35
+            }
           }
         ]
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawSql": "SELECT bucket_ts AS time, SUM(pn_mw) AS \"PN\", SUM(boa_level_mw) AS \"Dispatched\", SUM(mel_mw) AS \"MEL\" FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) GROUP BY bucket_ts ORDER BY bucket_ts"
-        },
-        {
-          "refId": "B",
-          "format": "time_series",
-          "rawSql": "SELECT bucket_ts AS time, b1610_mw AS \"B1610 actual\" FROM b1610_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) ORDER BY bucket_ts"
-        }
-      ]
+      }
     },
-    {
-      "id": 2,
-      "type": "timeseries",
-      "title": "$station — dispatched per BMU",
-      "datasource": { "type": "postgres", "uid": "gbgrid" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "MW",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 50,
-            "stacking": { "mode": "normal", "group": "A" }
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawSql": "SELECT bucket_ts AS time, bmu AS metric, boa_level_mw AS value FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) ORDER BY bucket_ts, bmu"
-        }
-      ]
+    "links": [],
+    "liveNow": false,
+    "preload": false,
+    "tags": [],
+    "timeSettings": {
+      "autoRefresh": "30s",
+      "autoRefreshIntervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "fiscalYearStartMonth": 0,
+      "from": "now-24h",
+      "hideTimepicker": false,
+      "timezone": "browser",
+      "to": "now"
     },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "title": "$station — SO turn-up (+) and BOA curtailment (−)",
-      "datasource": { "type": "postgres", "uid": "gbgrid" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "MW",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 40
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "SO turn-up" },
-            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+    "title": "BMU dispatch",
+    "variables": [
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
           },
-          {
-            "matcher": { "id": "byName", "options": "BOA curtailment" },
-            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          "hide": "dontHide",
+          "includeAll": false,
+          "label": "Station",
+          "multi": false,
+          "name": "station",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "gbgrid"
+            },
+            "group": "postgres",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "SELECT DISTINCT b.station FROM bmu b JOIN bmu_dispatch d ON d.bmu = b.ngc_bm_unit ORDER BY 1"
+            },
+            "version": "v0"
           },
-          {
-            "matcher": { "id": "byName", "options": "SO curtailment" },
-            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawSql": "SELECT bucket_ts AS time, SUM(so_turnup_mw) AS \"SO turn-up\", -SUM(boa_curtailment_mw) AS \"BOA curtailment\", -SUM(so_curtailment_mw) AS \"SO curtailment\" FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) GROUP BY bucket_ts ORDER BY bucket_ts"
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "disabled"
         }
-      ]
-    }
-  ]
+      }
+    ]
+  }
 }
