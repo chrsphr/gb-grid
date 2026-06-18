@@ -1,0 +1,57 @@
+{
+  "label": "timescale",
+  "timescaledb": "2.23.1",
+  "params": {
+    "station": "AG-GSTK",
+    "cgroup": "SCOTEX",
+    "window_days": 7,
+    "first": "2026-05-01 00:30:00",
+    "last": "2026-05-14 18:55:00"
+  },
+  "reads": {
+    "disp_station_range": {
+      "median_ms": 12.11,
+      "min_ms": 11.91,
+      "rows": 2017
+    },
+    "disp_station_curtailment": {
+      "median_ms": 12.27,
+      "min_ms": 11.58,
+      "rows": 2017
+    },
+    "annual_summary_pn": {
+      "median_ms": 54.75,
+      "min_ms": 51.33,
+      "rows": 14
+    },
+    "b1610_station": {
+      "median_ms": 164.64,
+      "min_ms": 163.07,
+      "rows": 10
+    },
+    "constraints_window": {
+      "median_ms": 2.21,
+      "min_ms": 2.02,
+      "rows": 336
+    }
+  },
+  "storage": {
+    "bmu_dispatch": 1608712192,
+    "mels": 351674368,
+    "pn": 283336704,
+    "b1610": 339664896,
+    "constraints": 118743040,
+    "boalf": 64266240,
+    "fuelinst": 10977280
+  },
+  "pandas_dispatch": {
+    "median_ms": 254.5,
+    "rows": 4320,
+    "units": 15
+  },
+  "rollup": {
+    "median_ms": 17.39,
+    "rows": null
+  },
+  "storage_total": 2777374720
+}

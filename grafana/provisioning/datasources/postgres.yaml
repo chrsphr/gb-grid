@@ -12,4 +12,4 @@ datasources:
       database: ${PGDATABASE}
       sslmode: disable
       postgresVersion: 1600
-      timescaledb: false
+      timescaledb: true
