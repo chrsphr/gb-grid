@@ -153,7 +153,7 @@
         {
           "refId": "A",
           "format": "time_series",
-          "rawSql": "SELECT d.ts AS time, SUM(d.pn_mw) AS \"PN\", SUM(d.boa_level_mw) AS \"Dispatched\", SUM(d.mel_mw) AS \"MEL\" FROM bmu_dispatch d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY d.ts ORDER BY d.ts"
+          "rawSql": "SELECT bucket_ts AS time, SUM(pn_mw) AS \"PN\", SUM(boa_level_mw) AS \"Dispatched\", SUM(mel_mw) AS \"MEL\" FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) GROUP BY bucket_ts ORDER BY bucket_ts"
         },
         {
           "refId": "B",
@@ -184,7 +184,7 @@
         {
           "refId": "A",
           "format": "time_series",
-          "rawSql": "SELECT d.ts AS time, d.bmu AS metric, d.boa_level_mw AS value FROM bmu_dispatch d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.ts BETWEEN $__timeFrom() AND $__timeTo() ORDER BY d.ts, d.bmu"
+          "rawSql": "SELECT bucket_ts AS time, bmu AS metric, boa_level_mw AS value FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) ORDER BY bucket_ts, bmu"
         }
       ]
     },
@@ -222,7 +222,7 @@
         {
           "refId": "A",
           "format": "time_series",
-          "rawSql": "SELECT d.ts AS time, SUM(d.so_turnup_mw) AS \"SO turn-up\", -SUM(d.boa_curtailment_mw) AS \"BOA curtailment\", -SUM(d.so_curtailment_mw) AS \"SO curtailment\" FROM bmu_dispatch d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station = '$station' AND d.ts BETWEEN $__timeFrom() AND $__timeTo() GROUP BY d.ts ORDER BY d.ts"
+          "rawSql": "SELECT bucket_ts AS time, SUM(so_turnup_mw) AS \"SO turn-up\", -SUM(boa_curtailment_mw) AS \"BOA curtailment\", -SUM(so_curtailment_mw) AS \"SO curtailment\" FROM dispatch_series('$station', $__timeFrom(), $__timeTo(), ('$__interval')::interval) GROUP BY bucket_ts ORDER BY bucket_ts"
         }
       ]
     }
