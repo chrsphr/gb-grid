@@ -127,6 +127,10 @@ in {
         WorkingDirectory = appHome;
         ExecStartPre = "${gb-grid-pkg}/bin/gb-grid migrate";
         ExecStart = "${gb-grid-pkg}/bin/gb-grid run";
+        # The TimescaleDB hypertable conversion (migration 0009) rewrites the
+        # large tables under migrate_data and takes minutes; without this the
+        # default 90s start timeout would kill it mid-conversion.
+        TimeoutStartSec = "1800";
         Restart = "on-failure";
         RestartSec = "30s";
         NoNewPrivileges = true;
