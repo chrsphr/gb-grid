@@ -9,7 +9,12 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+          # TimescaleDB community edition is under the TSL licence (free for
+          # self-hosting; not OSI). Allow just that one package.
+          config.allowUnfreePredicate = p: builtins.elem (nixpkgs.lib.getName p) [ "timescaledb" ];
+        };
         python = pkgs.python313;
 
         gb-grid = python.pkgs.buildPythonApplication {
@@ -48,7 +53,7 @@
           packages = with pkgs; [
             python313
             uv
-            postgresql_16
+            (postgresql_16.withPackages (p: [ p.timescaledb ]))
             grafana
             just
             ruff

@@ -6,6 +6,16 @@ let
   dbUser = "gb_grid";
   appHome = "/var/lib/gb-grid";
   dashboardsDir = ./../grafana/dashboards;
+
+  # TimescaleDB is under the (unfree) TSL licence. Allow just that one package
+  # via a scoped pkgs import so consumers don't need host-wide allowUnfree.
+  tsPkgs = import pkgs.path {
+    inherit (pkgs) system;
+    config = pkgs.config // {
+      allowUnfreePredicate = p: builtins.elem (lib.getName p) [ "timescaledb" ];
+    };
+  };
+  pgPackage = tsPkgs.postgresql_16.withPackages (p: [ p.timescaledb ]);
 in {
   options.services.gb-grid = {
     enable = lib.mkEnableOption "GB-grid ingester, Postgres, and Grafana";
@@ -23,7 +33,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = [ gb-grid-pkg pkgs.postgresql_16 ];
+    environment.systemPackages = [ gb-grid-pkg pgPackage ];
 
     users.users.${dbUser} = {
       isSystemUser = true;
@@ -39,8 +49,12 @@ in {
 
     services.postgresql = {
       enable = true;
-      package = pkgs.postgresql_16;
+      package = pgPackage;
       enableTCPIP = true;
+      settings = {
+        shared_preload_libraries = "timescaledb";
+        "timescaledb.telemetry_level" = "off";
+      };
       ensureDatabases = [ dbName ];
       ensureUsers = [{
         name = dbUser;
@@ -80,7 +94,7 @@ in {
             database = dbName;
             sslmode = "disable";
             postgresVersion = 1600;
-            timescaledb = false;
+            timescaledb = true;
           };
         }];
         dashboards.settings.providers = [{

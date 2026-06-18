@@ -128,32 +128,33 @@ def materialize_dispatch_daily(
     start_date: Any,
     end_date: Any,
 ) -> int:
-    """Roll ``bmu_dispatch`` (and ``b1610``) up to per-BMU daily MWh totals.
+    """Roll the daily continuous aggregates up into per-BMU daily MWh totals.
 
-    Pure SQL upsert — fast enough to recompute the whole year on demand.
-    ``start_date`` and ``end_date`` are inclusive ``date`` objects.
+    Reads ``bmu_dispatch_daily_cagg`` + ``b1610_daily_cagg`` (each ~tens of
+    thousands of pre-aggregated rows) rather than re-scanning raw ``bmu_dispatch``
+    /``b1610`` — the CAGGs are kept fresh by their refresh policies (and real-time
+    aggregation covers any not-yet-materialized tail). Cheap enough to recompute
+    the whole year on demand. ``start_date`` and ``end_date`` are inclusive
+    ``date`` objects. Day buckets are true UTC (via ``time_bucket`` in the CAGG).
     """
     sql = """
     WITH dispatch AS (
         SELECT bmu,
-               (ts AT TIME ZONE 'UTC')::date AS date,
-               SUM(pn_mw)              * %(h)s AS pn_mwh,
-               SUM(boa_level_mw)       * %(h)s AS boa_dispatched_mwh,
-               SUM(so_turnup_mw)       * %(h)s AS so_turnup_mwh,
-               SUM(boa_curtailment_mw) * %(h)s AS boa_curtailment_mwh,
-               SUM(so_curtailment_mw)  * %(h)s AS so_curtailment_mwh
-        FROM bmu_dispatch
-        WHERE ts >= %(start)s AND ts < %(end)s
-        GROUP BY bmu, (ts AT TIME ZONE 'UTC')::date
+               bucket::date AS date,
+               pn_mw_sum     * %(h)s AS pn_mwh,
+               boa_mw_sum    * %(h)s AS boa_dispatched_mwh,
+               so_turnup_sum * %(h)s AS so_turnup_mwh,
+               boa_curt_sum  * %(h)s AS boa_curtailment_mwh,
+               so_curt_sum   * %(h)s AS so_curtailment_mwh
+        FROM bmu_dispatch_daily_cagg
+        WHERE bucket >= %(start)s AND bucket < %(end)s
     ),
     actual AS (
-        SELECT ngc_bm_unit AS bmu,
-               settlement_date  AS date,
-               SUM(quantity_mwh) AS b1610_mwh
-        FROM b1610
-        WHERE settlement_date >= %(start_d)s AND settlement_date <= %(end_d)s
-          AND ngc_bm_unit IS NOT NULL
-        GROUP BY ngc_bm_unit, settlement_date
+        SELECT bmu,
+               bucket AS date,
+               b1610_mwh
+        FROM b1610_daily_cagg
+        WHERE bucket >= %(start_d)s AND bucket <= %(end_d)s
     )
     INSERT INTO bmu_dispatch_daily (
         bmu, date, pn_mwh, boa_dispatched_mwh,
