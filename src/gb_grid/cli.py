@@ -128,6 +128,35 @@ def materialize_dispatch_daily_cmd(
     typer.echo(f"wrote {n} rows")
 
 
+@app.command("refresh-caggs")
+def refresh_caggs_cmd(
+    from_: Annotated[str, typer.Option("--from", help="YYYY-MM-DD inclusive")],
+    to: Annotated[str, typer.Option("--to", help="YYYY-MM-DD inclusive")],
+) -> None:
+    """Refresh all continuous aggregates over a date window.
+
+    `backfill` and `materialize-dispatch` already refresh their own caggs, so you
+    only need this to repair caggs after a manual load, or to force a historical
+    window the refresh policies (which only reach back ~30 days) never covered.
+    """
+    from datetime import timedelta
+
+    from .db import refresh_caggs
+    from .ingest.b1610 import B1610_CAGGS
+    from .materialize import DISPATCH_CAGGS
+
+    start_d = _parse_date(from_)
+    end_d = _parse_date(to)
+    conn = connect()
+    try:
+        refresh_caggs(conn, DISPATCH_CAGGS, datetime.combine(start_d, time.min),
+                      datetime.combine(end_d, time.max))
+        refresh_caggs(conn, B1610_CAGGS, start_d, end_d + timedelta(days=1))
+    finally:
+        conn.close()
+    typer.echo("refreshed caggs")
+
+
 @app.command("refresh-constraints")
 def refresh_constraints_cmd() -> None:
     """Download and upsert the NESO day-ahead constraint flows CSV."""

@@ -16,12 +16,18 @@ import psycopg
 import structlog
 
 from .analytics import bmu_dispatch
-from .db import connect, upsert
+from .db import connect, refresh_caggs, upsert
 
 log = structlog.get_logger(__name__)
 
 TABLE = "bmu_dispatch"
 CONFLICT_COLS = ("bmu", "ts")
+
+# Continuous aggregates built on bmu_dispatch. They have refresh *policies*, but
+# those only reach back ~30 days, so a historical (re)materialize would never
+# surface in the cagg-backed dashboard panels (dispatch_series at hour/day zoom,
+# and the daily rollup). Refresh them over the window we just wrote.
+DISPATCH_CAGGS = ("bmu_dispatch_hourly", "bmu_dispatch_daily_mw", "bmu_dispatch_daily_cagg")
 
 
 def _active_bmus(conn: psycopg.Connection, start: datetime, end: datetime) -> list[str]:
@@ -106,6 +112,10 @@ def materialize_dispatch(
                 rows = fut.result()
                 if rows:
                     total += upsert(conn, TABLE, rows, CONFLICT_COLS)
+
+    # Fold the freshly-written rows into the caggs the dashboards read (conn is
+    # autocommit, so the upserts above are already committed and visible here).
+    refresh_caggs(conn, DISPATCH_CAGGS, start, end)
 
     log.info(
         "materialize_dispatch_wrote",
