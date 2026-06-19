@@ -22,6 +22,8 @@ The whole stack runs from a single `docker compose up` — Postgres, Grafana, an
 a background ingester that keeps the data current. If you use [Nix](https://nixos.org/),
 there's a dev shell layered on the same services.
 
+![BMU dispatch dashboard](docs/images/bmu_dispatch.png)
+
 > [!CAUTION]
 > This repo is almost entirely vibe-coded. Do not expect quality, but also, let me assure you it would be even worse if I attempted to write this myself.
 
@@ -130,14 +132,25 @@ served as a reference for a lot of the processing here.
 - `gb-grid status` — row counts and latest timestamps
 - `gb-grid sql` — open `psql` against the configured database
 
-## Grafana
+## Dashboards
 
 `docker compose` runs Grafana on <http://localhost:3000> (anonymous Editor
 access; admin/admin if you want to log in), provisioned from
 `docker/grafana/provisioning/` (datasource uid `gbgrid`, pointed at the `db`
-service) plus the dashboards in `grafana/dashboards/`:
+service) plus the dashboards in `grafana/dashboards/`.
 
-- `dashboards/bmu_dispatch.json` — pick a station (or click one on the map) to see station-aggregate PN, dispatched, MEL and B1610, a stacked dispatched-per-BMU breakdown, and turn-up / curtailment
+### BMU dispatch
+
+Pick a station (or click one on the map) to see its aggregate planned vs.
+instructed vs. actual output, a stacked per-BMU breakdown, and the turn-up /
+curtailment the system operator instructed.
+
+![BMU dispatch dashboard](docs/images/bmu_dispatch.png)
+
+The bottom panel separates instructed **turn-up** (green, generate more) from
+**curtailment** (red, generate less) per BMU:
+
+![BMU dispatch — turn-up and curtailment](docs/images/bmu_dispatch_curtailment.png)
 
 > [!NOTE]
 > The PN / Dispatched / B1610 series on the station-total panel still need
@@ -145,6 +158,22 @@ service) plus the dashboards in `grafana/dashboards/`:
 > vs. half-hourly settlement actuals) and don't always reconcile cleanly,
 > especially around BOA acceptances and during B1610's ~5-working-day lag.
 > Treat them as a sanity check on each other, not as the same number.
+
+### BMU output heatmap
+
+National generation by fuel type, with per-station load-factor heatmaps (output
+as a % of each station's MEL capacity) grouped by fuel — a quick read on which
+plants are running hard and which are idle.
+
+![BMU output heatmap dashboard](docs/images/bmu_heatmap.png)
+
+### BMU annual summary
+
+A year of daily output per station as a calendar heatmap, either in absolute
+MWh/day or — pictured — as a % of MEL capacity, alongside a map for selecting
+stations and fuel types.
+
+![BMU annual summary (% of MEL capacity) dashboard](docs/images/bmu_annual_summary_pct.png)
 
 Backfill, then materialize, then open Grafana:
 
