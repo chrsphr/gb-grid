@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from typing import Any
 
 import psycopg
@@ -115,7 +115,13 @@ def materialize_dispatch(
 
     # Fold the freshly-written rows into the caggs the dashboards read (conn is
     # autocommit, so the upserts above are already committed and visible here).
-    refresh_caggs(conn, DISPATCH_CAGGS, start, end)
+    # Snap to whole UTC days: the daily caggs bucket by day, and
+    # refresh_continuous_aggregate() errors on a sub-bucket window (e.g. the
+    # scheduler's 6-hour rolling materialize). Day boundaries also align with the
+    # hourly cagg's buckets.
+    ref_start = datetime.combine(start.date(), time.min)
+    ref_end = datetime.combine(end.date() + timedelta(days=1), time.min)
+    refresh_caggs(conn, DISPATCH_CAGGS, ref_start, ref_end)
 
     log.info(
         "materialize_dispatch_wrote",
@@ -187,8 +193,6 @@ def materialize_dispatch_daily(
     """
     # bmu_dispatch is range-scanned by ts; b1610 is keyed on settlement_date.
     # Use end-of-day on `end_date` so a full inclusive day window catches everything.
-    from datetime import datetime, time, timedelta
-
     start_dt = datetime.combine(start_date, time.min)
     end_dt = datetime.combine(end_date + timedelta(days=1), time.min)
 
