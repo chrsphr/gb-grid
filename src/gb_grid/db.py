@@ -39,6 +39,31 @@ def migrate(url: str | None = None) -> int:
     return n
 
 
+def refresh_continuous_aggregate(
+    conn: psycopg.Connection, cagg: str, start: Any, end: Any
+) -> None:
+    """Refresh continuous aggregate ``cagg`` over ``[start, end)``.
+
+    ``refresh_continuous_aggregate()`` cannot run inside a transaction block, so
+    ``conn`` must be autocommit (as :func:`connect` returns). The cagg name is an
+    internal constant (never user input) and is interpolated directly: the
+    procedure's first argument is a ``regclass`` and so cannot be a bind
+    parameter.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            f"CALL refresh_continuous_aggregate('{cagg}', %s, %s)", (start, end)
+        )
+
+
+def refresh_caggs(
+    conn: psycopg.Connection, caggs: Iterable[str], start: Any, end: Any
+) -> None:
+    """Refresh several continuous aggregates over the same window."""
+    for cagg in caggs:
+        refresh_continuous_aggregate(conn, cagg, start, end)
+
+
 def upsert(
     conn: psycopg.Connection,
     table: str,
