@@ -1,0 +1,246 @@
+{
+  "title": "BMU annual summary (% of MEL capacity)",
+  "uid": "bmu-annual-summary-pct",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": { "from": "now-1y", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "fuel_type",
+        "label": "Fuel type",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "gbgrid" },
+        "query": "SELECT DISTINCT COALESCE(bmrs_fuel_type, 'UNKNOWN') AS fuel FROM bmu ORDER BY fuel",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["WIND"], "value": ["WIND"] }
+      },
+      {
+        "name": "station",
+        "label": "Station",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "gbgrid" },
+        "query": "SELECT DISTINCT station FROM bmu WHERE station IS NOT NULL ORDER BY station",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 10,
+      "type": "geomap",
+      "title": "Stations — click to select (combines with fuel type and station dropdowns above)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT station, AVG(latitude) AS latitude, AVG(longitude) AS longitude, MODE() WITHIN GROUP (ORDER BY COALESCE(bmrs_fuel_type, 'UNKNOWN')) AS fuel_type, COUNT(*) AS bmus FROM bmu WHERE latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY station"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "links": [
+            {
+              "title": "Select ${__data.fields.station}",
+              "url": "/d/bmu-annual-summary-pct?var-station=${__data.fields.station}&${__url_time_range}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "fuel_type" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "WIND":    { "color": "#99dd55", "index": 0,  "text": "WIND" },
+                      "CCGT":    { "color": "#ee9944", "index": 1,  "text": "CCGT" },
+                      "OCGT":    { "color": "#ee9944", "index": 2,  "text": "OCGT" },
+                      "NUCLEAR": { "color": "#0099cc", "index": 3,  "text": "NUCLEAR" },
+                      "BIOMASS": { "color": "#aa3355", "index": 4,  "text": "BIOMASS" },
+                      "COAL":    { "color": "#aa3355", "index": 5,  "text": "COAL" },
+                      "NPSHYD":  { "color": "#22ccbb", "index": 6,  "text": "NPSHYD" },
+                      "PS":      { "color": "#00b0bd", "index": 7,  "text": "PS" },
+                      "INTFR":   { "color": "#aaaaaa", "index": 8,  "text": "INTFR" },
+                      "INTBN":   { "color": "#aaaaaa", "index": 9,  "text": "INTBN" },
+                      "INTNEM":  { "color": "#aaaaaa", "index": 10, "text": "INTNEM" },
+                      "INTEW":   { "color": "#aaaaaa", "index": 11, "text": "INTEW" },
+                      "INTIRL":  { "color": "#aaaaaa", "index": 12, "text": "INTIRL" },
+                      "INTGRNL": { "color": "#aaaaaa", "index": 13, "text": "INTGRNL" },
+                      "OTHER":   { "color": "#9400FF", "index": 14, "text": "OTHER" },
+                      "UNKNOWN": { "color": "#cccccc", "index": 15, "text": "UNKNOWN" }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "view": { "id": "coords", "lat": 54.5, "lon": -3, "zoom": 5 },
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showScale": false,
+          "showMeasure": false,
+          "showDebug": false
+        },
+        "basemap": { "type": "default", "name": "Layer 0", "config": {} },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Stations",
+            "config": {
+              "style": {
+                "size": { "fixed": 7 },
+                "color": { "field": "fuel_type" },
+                "opacity": 0.85,
+                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" },
+                "textConfig": { "fontSize": 12, "textAlign": "center", "textBaseline": "middle" }
+              },
+              "showLegend": true
+            },
+            "location": { "mode": "coords", "latitude": "latitude", "longitude": "longitude" },
+            "tooltip": true
+          }
+        ],
+        "tooltip": { "mode": "details" }
+      }
+    },
+    {
+      "id": 1,
+      "type": "heatmap",
+      "title": "PN (% of MEL capacity/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "opacity", "fill": "#FF9900", "steps": 64, "exponent": 0.5, "reverse": true, "min": 0, "max": 100 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 2,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "WITH cap AS (SELECT COALESCE(SUM(m.cap),0) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type)) SELECT date_trunc('week', d.date)::timestamp AS time, to_char(d.date, 'ID') AS metric, 100.0 * SUM(d.pn_mwh) / NULLIF((SELECT cap FROM cap) * 24.0, 0) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.date BETWEEN $__timeFrom() AND $__timeTo() GROUP BY date_trunc('week', d.date), d.date ORDER BY time, metric"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "heatmap",
+      "title": "Dispatched (% of MEL capacity/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "opacity", "fill": "#FF9900", "steps": 64, "exponent": 0.5, "reverse": true, "min": 0, "max": 100 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 2,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "WITH cap AS (SELECT COALESCE(SUM(m.cap),0) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type)) SELECT date_trunc('week', d.date)::timestamp AS time, to_char(d.date, 'ID') AS metric, 100.0 * SUM(d.boa_dispatched_mwh) / NULLIF((SELECT cap FROM cap) * 24.0, 0) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.date BETWEEN $__timeFrom() AND $__timeTo() GROUP BY date_trunc('week', d.date), d.date ORDER BY time, metric"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "heatmap",
+      "title": "B1610 actual (% of MEL capacity/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "opacity", "fill": "#FF9900", "steps": 64, "exponent": 0.5, "reverse": true, "min": 0, "max": 100 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 2,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "WITH cap AS (SELECT COALESCE(SUM(m.cap),0) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type)) SELECT date_trunc('week', d.date)::timestamp AS time, to_char(d.date, 'ID') AS metric, 100.0 * SUM(d.b1610_mwh) / NULLIF((SELECT cap FROM cap) * 24.0, 0) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.date BETWEEN $__timeFrom() AND $__timeTo() GROUP BY date_trunc('week', d.date), d.date ORDER BY time, metric"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "heatmap",
+      "title": "SO turn-up (% of MEL capacity/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "opacity", "fill": "#73BF69", "steps": 64, "exponent": 0.5, "reverse": true, "min": 0, "max": 100 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 2,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "WITH cap AS (SELECT COALESCE(SUM(m.cap),0) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type)) SELECT date_trunc('week', d.date)::timestamp AS time, to_char(d.date, 'ID') AS metric, 100.0 * SUM(d.so_turnup_mwh) / NULLIF((SELECT cap FROM cap) * 24.0, 0) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.date BETWEEN $__timeFrom() AND $__timeTo() GROUP BY date_trunc('week', d.date), d.date ORDER BY time, metric"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "heatmap",
+      "title": "BOA curtailment (% of MEL capacity/day)",
+      "datasource": { "type": "postgres", "uid": "gbgrid" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] },
+      "options": {
+        "calculate": false,
+        "color": { "mode": "opacity", "fill": "#F2495C", "steps": 64, "exponent": 0.5, "reverse": true, "min": 0, "max": 100 },
+        "yAxis": { "axisPlacement": "left", "reverse": false },
+        "cellGap": 2,
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "WITH cap AS (SELECT COALESCE(SUM(m.cap),0) AS cap FROM (SELECT national_grid_bm_unit AS ngc, MAX(GREATEST(level_from, level_to)) AS cap FROM mels WHERE time_from >= $__timeFrom() AND time_from < $__timeTo() GROUP BY 1) m JOIN bmu b ON b.ngc_bm_unit = m.ngc WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type)) SELECT date_trunc('week', d.date)::timestamp AS time, to_char(d.date, 'ID') AS metric, 100.0 * SUM(d.boa_curtailment_mwh) / NULLIF((SELECT cap FROM cap) * 24.0, 0) AS value FROM bmu_dispatch_daily d JOIN bmu b ON b.ngc_bm_unit = d.bmu WHERE b.station IN ($station) AND COALESCE(b.bmrs_fuel_type, 'UNKNOWN') IN ($fuel_type) AND d.date BETWEEN $__timeFrom() AND $__timeTo() GROUP BY date_trunc('week', d.date), d.date ORDER BY time, metric"
+        }
+      ]
+    }
+  ]
+}
