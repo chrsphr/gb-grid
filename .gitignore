@@ -8,6 +8,7 @@ __pycache__/
 data/
 .direnv/
 .envrc.local
+.env
 dist/
 build/
 *.egg-info/

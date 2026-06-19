@@ -1,0 +1,69 @@
+# Spin up the whole gb-grid stack without Nix:
+#
+#   docker compose up -d --build
+#   docker compose run --rm app gb-grid backfill --from 2026-04-01 --to 2026-05-01
+#   open http://localhost:3000   (anonymous Editor; admin/admin to log in)
+#
+# Postgres/TimescaleDB and Grafana are pulled from their official registries at
+# run time — this repo only ships its own app image + config, so no third-party
+# binaries are redistributed here.
+name: gb-grid
+
+services:
+  db:
+    # TimescaleDB community edition (TSL licence; free to self-host). Preloads
+    # the timescaledb library; migration 0009 creates the extension.
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_DB: gb_grid
+      POSTGRES_USER: gb_grid
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gbgrid}
+    ports:
+      # Host 5433 mirrors the Nix devShell, so local psql/GUI clients match docs.
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gb_grid -d gb_grid"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: gb-grid:local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GB_GRID_DATABASE_URL: postgresql://gb_grid:${POSTGRES_PASSWORD:-gbgrid}@db:5432/gb_grid
+    # Apply migrations, then run the always-on ingester. The hypertable
+    # conversion in migration 0009 can take a while on a populated DB.
+    command: ["sh", "-c", "gb-grid migrate && gb-grid run"]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    depends_on:
+      - db
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Editor
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      # Consumed by the provisioned datasource (see docker/grafana/provisioning).
+      GBGRID_DB_PASSWORD: ${POSTGRES_PASSWORD:-gbgrid}
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  grafana-data:

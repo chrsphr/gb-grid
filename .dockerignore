@@ -1,0 +1,13 @@
+# Keep the build context small and avoid baking local state into the image.
+.git
+.venv
+.postgres
+.grafana
+result
+notebooks
+bench/results
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.direnv
