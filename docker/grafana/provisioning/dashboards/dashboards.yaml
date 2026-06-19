@@ -1,0 +1,15 @@
+apiVersion: 1
+
+# Loads the dashboards mounted at /var/lib/grafana/dashboards (./grafana/dashboards
+# on the host). Fixed path, so no env substitution needed inside the container.
+providers:
+  - name: gb-grid
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

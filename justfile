@@ -29,3 +29,17 @@ lint:
 
 kernel:
     ./scripts/register-kernel.sh
+
+# --- Docker (no Nix required) ---
+
+docker-up:
+    docker compose up -d --build
+
+docker-down:
+    docker compose down
+
+docker-backfill FROM TO *DATASETS:
+    docker compose run --rm app gb-grid backfill --from {{FROM}} --to {{TO}} {{DATASETS}}
+
+docker-logs:
+    docker compose logs -f app
