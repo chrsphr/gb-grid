@@ -104,6 +104,9 @@ the dispatch dashboards read.
 - **[Elexon BMRS Insights API](https://bmrs.elexon.co.uk/)** — the live grid
   data feed (`fuelinst`, `b1610`, `pn`, `boalf`, `mels`, `system_prices`). Free,
   no key required.
+
+  > Elexon data is accessed under the [following open license terms](https://www.elexon.co.uk/bsc/data/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/)
+  
 - **[NESO](https://www.neso.energy/data-portal)** (National Energy System
   Operator) — the day-ahead constraint flows, and the BMU registry used to build
   the static `bmu` table.
