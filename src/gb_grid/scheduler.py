@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -121,7 +122,7 @@ def _materialize_daily_tick() -> None:
 
 
 async def run_scheduler() -> None:
-    log.info("scheduler_starting")
+    log.info("scheduler_starting", intervals=asdict(POLL))
     await asyncio.gather(
         _loop("fuelinst", POLL.fuelinst_seconds, _fuelinst_tick),
         _loop("boalf", POLL.boalf_seconds, _boalf_tick),

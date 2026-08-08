@@ -196,6 +196,8 @@ Schema lives in `src/gb_grid/migrations/` as numbered SQL files, applied with
 | `GB_GRID_DATABASE_URL` | Postgres connection URL | _(set by devShell; required otherwise)_ |
 | `GB_GRID_API_BASE` | BMRS API base URL | `https://data.elexon.co.uk/bmrs/api/v1` |
 | `GB_GRID_HTTP_TIMEOUT` | HTTP timeout (seconds) | `60` |
+| `GB_GRID_POLL_SECONDS` | Scheduler tick interval for every loop | `3600` |
+| `GB_GRID_POLL_<DATASET>_SECONDS` | Override one loop; `<DATASET>` is `FUELINST`, `BOALF`, `B1610`, `PN`, `MELS`, `SYSTEM_PRICES`, `MATERIALIZE`, `MATERIALIZE_DAILY` | `GB_GRID_POLL_SECONDS` |
 
 ## Deployment
 I've deployed this myself in "production" at home using nixos on proxmox — you can see

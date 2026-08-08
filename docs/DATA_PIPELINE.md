@@ -53,18 +53,23 @@ compressed (columnar, `segmentby` = entity, `orderby` = time).
 
 | Dataset | Interval | Window |
 |---|---|---|
-| fuelinst | 5 min | watermark (or now−2h) → now |
-| boalf | 5 min | now−4h → now |
-| pn / mels | 5 min | now−4h → now+24h |
-| b1610 | 30 min | today−14 → today−3 (inside the published zone) |
-| system_prices | 60 min | yesterday → today |
+| fuelinst | hourly | watermark (or now−2h) → now |
+| boalf | hourly | now−4h → now |
+| pn / mels | hourly | now−4h → now+24h |
+| b1610 | hourly | today−14 → today−3 (inside the published zone) |
+| system_prices | hourly | yesterday → today |
 | constraints | daily timer | full NESO CSV (08:00 UTC, Mon–Fri) |
+
+Every interval defaults to hourly and is configurable: `GB_GRID_POLL_SECONDS`
+moves all of them, `GB_GRID_POLL_<DATASET>_SECONDS` (e.g.
+`GB_GRID_POLL_FUELINST_SECONDS=300`) overrides one. Each window is wider than an
+hourly tick, so the rolling overlap holds at the default.
 
 Historical loads use `gb-grid backfill --from --to [--dataset …]`.
 
 ## 2. Derived: per-BMU dispatch (`bmu_dispatch`)
 
-`materialize_dispatch` (scheduler tick: every 5 min over now−6h → now; or via
+`materialize_dispatch` (scheduler tick: hourly over now−6h → now; or via
 `gb-grid materialize-dispatch`) computes the **dispatch series** by interpolating
 the PN/BOA/MEL segments onto a fixed **5-minute grid** per BMU (pandas, in
 `analytics.bmu_dispatch`, fanned across a process pool). Written to the
