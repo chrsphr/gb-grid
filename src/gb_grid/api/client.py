@@ -6,12 +6,27 @@ from typing import Any
 import httpx
 from tenacity import (
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
 
 from ..config import API_BASE_URL, HTTP_TIMEOUT
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Only transport failures and transient statuses are worth another attempt.
+
+    A 400/404 means the request itself is wrong (bad window, dataset absent for
+    that date) and will fail identically five times over, so retrying it just
+    stalls a backfill for ~30s per bad chunk before surfacing the same error.
+    """
+    if isinstance(exc, httpx.TransportError):  # covers TimeoutException
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        return status == 429 or status >= 500
+    return False
 
 
 def _iso(dt: datetime) -> str:
@@ -55,15 +70,11 @@ class BMRSClient:
         reraise=True,
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=1, max=30),
-        retry=retry_if_exception_type(
-            (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
-        ),
+        retry=retry_if_exception(_is_retryable),
     )
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         resp = self._client.get(path, params=params)
-        if resp.status_code in (429,) or resp.status_code >= 500:
-            resp.raise_for_status()  # triggers retry
-        resp.raise_for_status()
+        resp.raise_for_status()  # 429/5xx retry, other 4xx fail fast
         return resp.json()
 
     @staticmethod

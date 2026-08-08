@@ -6,11 +6,16 @@ import psycopg
 
 from ..api.client import BMRSClient
 from ..api.endpoints import fetch_system_prices
-from ..db import set_watermark, upsert
+from ..db import set_watermark
+from .base import run_windows
 
 DATASET = "system_prices"
 TABLE = "system_prices"
 CONFLICT = ["settlement_date", "settlement_period"]
+
+
+def _days(start: date, end: date) -> list[date]:
+    return [start + timedelta(days=i) for i in range((end - start).days + 1)]
 
 
 def ingest_system_prices(
@@ -19,17 +24,17 @@ def ingest_system_prices(
     start: date,
     end: date,
 ) -> int:
-    total = 0
-    cur = start
-    one = timedelta(days=1)
-    last_day_with_data: date | None = None
-    while cur <= end:
-        rows = fetch_system_prices(client, cur)
-        n = upsert(conn, TABLE, rows, CONFLICT)
-        total += n
-        if n:
-            last_day_with_data = cur
-        cur += one
-    if last_day_with_data is not None:
-        set_watermark(conn, DATASET, datetime.combine(last_day_with_data, time.max))
-    return total
+    result = run_windows(
+        conn,
+        dataset=DATASET,
+        table=TABLE,
+        conflict_cols=CONFLICT,
+        windows=_days(start, end),
+        fetch=lambda day: fetch_system_prices(client, day),
+        watermark_col=None,
+    )
+    if result.last_window_with_data is not None:
+        set_watermark(
+            conn, DATASET, datetime.combine(result.last_window_with_data, time.max)
+        )
+    return result.rows

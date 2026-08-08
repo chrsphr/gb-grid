@@ -6,7 +6,7 @@ import psycopg
 
 from ..api.client import BMRSClient
 from ..api.endpoints import fetch_boalf
-from .base import datetime_range, run_window
+from .base import datetime_range, run_windows
 
 DATASET = "boalf"
 TABLE = "boalf"
@@ -20,14 +20,12 @@ def ingest_boalf(
     end: datetime,
     chunk: timedelta = timedelta(hours=6),
 ) -> int:
-    total = 0
-    for w_start, w_end in datetime_range(start, end, chunk):
-        total += run_window(
-            conn,
-            dataset=DATASET,
-            table=TABLE,
-            conflict_cols=CONFLICT,
-            fetch=lambda s=w_start, e=w_end: fetch_boalf(client, s, e),
-            watermark_col="time_from",
-        )
-    return total
+    return run_windows(
+        conn,
+        dataset=DATASET,
+        table=TABLE,
+        conflict_cols=CONFLICT,
+        windows=datetime_range(start, end, chunk),
+        fetch=lambda w: fetch_boalf(client, *w),
+        watermark_col="time_from",
+    ).rows

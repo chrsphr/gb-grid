@@ -15,6 +15,10 @@ API_BASE_URL = os.environ.get(
 HTTP_TIMEOUT = float(os.environ.get("GB_GRID_HTTP_TIMEOUT", "60"))
 
 
+# Windows fetched concurrently per ingest. Elexon rate-limits, so keep this
+# modest — too high just converts throughput into 429s and retry backoff.
+FETCH_CONCURRENCY = int(os.environ.get("GB_GRID_FETCH_CONCURRENCY", "4"))
+
 DEFAULT_POLL_SECONDS = 3600
 
 POLL_DATASETS = (
