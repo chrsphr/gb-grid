@@ -76,3 +76,61 @@ must stay row-store.
    with the filter on `d.bucket`, or a thin materialised table fed by the CAGGs.
 4. **pandas_dispatch control** got ~3× faster (778→255 ms) — chunk exclusion speeds
    the per-unit source reads feeding the interpolation. Bonus, partly cache.
+
+---
+
+# Ingest upsert paths — COPY vs executemany
+
+Methodology: `bench/upsert_paths.py`, dev Postgres over TCP (docker compose),
+synthetic fuelinst-shaped rows, throwaway target table truncated between runs.
+`copy` = COPY into an unlogged staging table + one `INSERT … SELECT … ON
+CONFLICT`; `executemany` = the previous row-wise path (psycopg3 pipelines it).
+
+| rows | plain table | plain, all conflict | **hypertable** | **hypertable, all conflict** |
+|---|--:|--:|--:|--:|
+| 500 | 0.7× | 0.6× | 2.2× | 1.7× |
+| 5,000 | 1.3× | 1.0× | 2.3× | 2.7× |
+| 50,000 | 1.2× | 1.2× | 2.7× | 3.5× |
+| 250,000 | 1.2× | 1.2× | 3.1× | 3.4× |
+
+(Speedup = executemany ÷ copy. 250k rows into a hypertable: 10.4s → 3.3s.)
+
+**Takeaway.** On plain tables COPY is barely worth it (~1.2×) and is a net loss
+for small batches. On hypertables — which is every real ingest target — it is
+2–3.5×, and the gap widens with batch size. psycopg3's pipelined `executemany`
+is much stronger than the usual "COPY is 10–100× faster" folklore suggests; the
+hypertable win comes from chunk routing being paid once per statement rather
+than once per row.
+
+`COPY_MIN_ROWS = 500` keeps small batches (the hourly scheduler ticks) on the
+executemany path, where the staging round-trip would otherwise dominate.
+
+---
+
+# Ingest fetch concurrency
+
+Methodology: `bench/ingest_concurrency.py`, boalf over 3–9 June 2026 (24 windows
+of 6h, 156,481 rows), live Elexon API, dev Postgres. First pass discarded so
+every timed pass is an equal all-rows-conflict update.
+
+| phase | concurrency 1 | 4 | 8 |
+|---|--:|--:|--:|
+| fetch only | 4.69s | **1.80s** | 1.81s |
+| write only (always serial) | 6.09s | — | — |
+
+| end to end | 1 | 2 | 4 | 8 |
+|---|--:|--:|--:|--:|
+| `run_windows` | 11.79s | 7.15s | **6.83s** | 6.94s |
+
+**Takeaway.** Fetch parallelises ~2.6× and plateaus at 4 threads — more just
+queues behind the API. Writes are serial by design (one connection, ordered for
+last-write-wins), so **the serial write time is the hard floor**: 6.09s here,
+against 6.83s achieved. End to end that is 1.7× for this dataset, and no
+concurrency setting can do better without parallelising the writes too.
+
+Getting there required pipelining rather than batching: the first implementation
+fetched a batch of N, then wrote it with the pool idle, and landed at ~9.4s
+(1.05× — almost nothing). Submitting the next fetch *before* writing the current
+batch overlaps the two phases and recovers the rest. Datasets whose payloads
+dominate (b1610) or any deployment with higher API latency should gain more;
+`GB_GRID_FETCH_CONCURRENCY` tunes it.

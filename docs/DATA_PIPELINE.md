@@ -67,6 +67,26 @@ hourly tick, so the rolling overlap holds at the default.
 
 Historical loads use `gb-grid backfill --from --to [--dataset …]`.
 
+**Ingest performance.** Windows within one dataset are fetched
+`GB_GRID_FETCH_CONCURRENCY` at a time (default 4) so HTTP latency overlaps
+rather than accumulating; writes stay serial and in window order, preserving
+last-write-wins and watermark semantics. Fetches are kept in flight *during* the
+writes, so a backfill runs at roughly its serial write time (~1.7× faster end to
+end; the write phase is the floor — see `bench/RESULTS.md`). Raising the setting
+past 4 does nothing: the API stops parallelising there. Batches of ≥500 rows are written by
+`COPY` into a staging table plus a single merge, which is 2–3.5× faster than
+row-wise upsert on hypertables (see `bench/RESULTS.md`); smaller batches take the
+row-wise path. Only 429/5xx responses are retried — other 4xx fail immediately
+instead of burning five backed-off attempts on a request that cannot succeed.
+
+The b1610 tick refreshes its continuous aggregates only for windows older than
+the policies' 30-day `start_offset`; anything newer is already refreshed
+automatically every 30 minutes, so backfills still repair history while the
+hourly tick does no redundant work.
+
+`constraints` sends `If-None-Match`/`If-Modified-Since` (validators cached in
+`ingest_http_cache`) and skips the download entirely on a 304.
+
 ## 2. Derived: per-BMU dispatch (`bmu_dispatch`)
 
 `materialize_dispatch` (scheduler tick: hourly over now−6h → now; or via

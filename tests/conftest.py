@@ -19,7 +19,17 @@ from gb_grid.db import migrate
 
 TEST_DB = "gb_grid_test"
 
-_TABLES = ["fuelinst", "b1610", "boalf", "pn", "mels", "system_prices", "ingest_watermark"]
+_TABLES = [
+    "fuelinst",
+    "b1610",
+    "boalf",
+    "pn",
+    "mels",
+    "system_prices",
+    "constraints",
+    "ingest_watermark",
+    "ingest_http_cache",
+]
 
 
 def _swap_dbname(url: str, dbname: str) -> str:
@@ -27,9 +37,11 @@ def _swap_dbname(url: str, dbname: str) -> str:
     parts = urlparse(url)
     new = parts._replace(path=f"/{dbname}")
     rebuilt = urlunparse(new)
-    # urlunparse drops the empty authority, producing "postgresql:/db?..." rather
-    # than "postgresql:///db?...". Re-insert the missing slashes.
-    if rebuilt.startswith("postgresql:/") and not rebuilt.startswith("postgresql:///"):
+    # With no authority (the socket form, "postgresql:///db?host=..."), urlunparse
+    # drops the empty authority and yields "postgresql:/db?..." — re-insert the
+    # missing slashes. A URL that *has* an authority ("postgresql://host/db", the
+    # docker-compose form) is already correct and must be left alone.
+    if not parts.netloc and rebuilt.startswith("postgresql:/"):
         rebuilt = rebuilt.replace("postgresql:/", "postgresql:///", 1)
     return rebuilt
 

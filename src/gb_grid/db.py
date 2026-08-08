@@ -13,6 +13,9 @@ from .config import database_url
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
+# Batch size at which COPY-into-staging overtakes row-wise executemany.
+COPY_MIN_ROWS = 500
+
 
 def _resolve_url(url: str | None = None) -> str:
     resolved = url or database_url()
@@ -70,27 +73,82 @@ def upsert(
     rows: Sequence[dict[str, Any]],
     conflict_cols: Sequence[str],
 ) -> int:
-    """Bulk upsert via a single ``INSERT … VALUES … ON CONFLICT DO UPDATE``."""
+    """Bulk upsert. Small batches go via ``executemany``; large ones via ``COPY``.
+
+    ``COPY`` into an unlogged staging table plus a single ``INSERT … SELECT``
+    merge beats row-wise ``executemany`` by a wide margin once batches get big
+    (backfills, the ~1M-row constraints CSV), because the rows cross the wire as
+    one stream and the merge is one statement. Below the threshold the staging
+    round-trip costs more than it saves.
+    """
     if not rows:
         return 0
+    if len(rows) < COPY_MIN_ROWS:
+        return _upsert_values(conn, table, rows, conflict_cols)
+    return _upsert_copy(conn, table, rows, conflict_cols)
 
-    cols = list(rows[0].keys())
+
+def _conflict_tail(cols: Sequence[str], conflict_cols: Sequence[str]) -> str:
+    conflict = ", ".join(conflict_cols)
     update_cols = [c for c in cols if c not in conflict_cols]
+    if not update_cols:
+        return f"ON CONFLICT ({conflict}) DO NOTHING"
+    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    return f"ON CONFLICT ({conflict}) DO UPDATE SET {set_clause}"
+
+
+def _upsert_values(
+    conn: psycopg.Connection,
+    table: str,
+    rows: Sequence[dict[str, Any]],
+    conflict_cols: Sequence[str],
+) -> int:
+    cols = list(rows[0].keys())
     col_list = ", ".join(cols)
     placeholders = "(" + ", ".join(["%s"] * len(cols)) + ")"
-    conflict = ", ".join(conflict_cols)
-
-    if update_cols:
-        set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
-        tail = f"ON CONFLICT ({conflict}) DO UPDATE SET {set_clause}"
-    else:
-        tail = f"ON CONFLICT ({conflict}) DO NOTHING"
-
-    values = [tuple(r.get(c) for c in cols) for r in rows]
-    sql = f"INSERT INTO {table} ({col_list}) VALUES {placeholders} {tail}"
+    sql = (
+        f"INSERT INTO {table} ({col_list}) VALUES {placeholders} "
+        f"{_conflict_tail(cols, conflict_cols)}"
+    )
+    values = (tuple(r.get(c) for c in cols) for r in rows)
 
     with conn.cursor() as cur:
-        cur.executemany(sql, values)
+        cur.executemany(sql, list(values))
+    return len(rows)
+
+
+def _upsert_copy(
+    conn: psycopg.Connection,
+    table: str,
+    rows: Sequence[dict[str, Any]],
+    conflict_cols: Sequence[str],
+) -> int:
+    cols = list(rows[0].keys())
+    col_list = ", ".join(cols)
+    conflict = ", ".join(conflict_cols)
+    stage = f"_stage_{table}"
+
+    # Deduplicate inside the batch before merging. `executemany` applies rows one
+    # statement at a time, so repeated keys within a batch just overwrite in
+    # order; a single INSERT … SELECT would instead abort with "ON CONFLICT DO
+    # UPDATE command cannot affect row a second time". MELS and BOALF both carry
+    # revisions that hit this. `_ord` (filled by COPY from its DEFAULT) preserves
+    # arrival order so DISTINCT ON keeps the last row per key, matching the
+    # last-write-wins behaviour of the executemany path.
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            f"CREATE TEMP TABLE {stage} (LIKE {table}) ON COMMIT DROP; "
+            f"ALTER TABLE {stage} ADD COLUMN _ord bigserial"
+        )
+        with cur.copy(f"COPY {stage} ({col_list}) FROM STDIN") as copy:
+            for r in rows:
+                copy.write_row(tuple(r.get(c) for c in cols))
+        cur.execute(
+            f"INSERT INTO {table} ({col_list}) "
+            f"SELECT DISTINCT ON ({conflict}) {col_list} FROM {stage} "
+            f"ORDER BY {conflict}, _ord DESC "
+            f"{_conflict_tail(cols, conflict_cols)}"
+        )
     return len(rows)
 
 
@@ -119,16 +177,3 @@ def table_stats(conn: psycopg.Connection, table: str, ts_col: str) -> dict[str, 
         cur.execute(f"SELECT count(*) AS rows, max({ts_col}) AS latest FROM {table}")
         row = cur.fetchone()
     return {"table": table, "rows": row["rows"], "latest": row["latest"]}
-
-
-def iter_chunks(
-    rows: Iterable[dict[str, Any]], size: int = 1000
-) -> Iterable[list[dict[str, Any]]]:
-    chunk: list[dict[str, Any]] = []
-    for r in rows:
-        chunk.append(r)
-        if len(chunk) >= size:
-            yield chunk
-            chunk = []
-    if chunk:
-        yield chunk
