@@ -10,7 +10,7 @@ let
   # TimescaleDB is under the (unfree) TSL licence. Allow just that one package
   # via a scoped pkgs import so consumers don't need host-wide allowUnfree.
   tsPkgs = import pkgs.path {
-    inherit (pkgs) system;
+    inherit (pkgs.stdenv.hostPlatform) system;
     config = pkgs.config // {
       allowUnfreePredicate = p: builtins.elem (lib.getName p) [ "timescaledb" ];
     };
