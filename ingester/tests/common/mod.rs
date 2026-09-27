@@ -70,7 +70,10 @@ fn bootstrap() -> Option<String> {
             .build()
             .ok()?;
         rt.block_on(async move {
-            let (conn, _) = tokio_postgres::connect(&admin, NoTls).await.ok()?;
+            let (conn, connection) = tokio_postgres::connect(&admin, NoTls).await.ok()?;
+            tokio::spawn(async move {
+                let _ = connection.await;
+            });
             conn.execute(&format!("DROP DATABASE IF EXISTS {name} WITH (FORCE)"), &[])
                 .await
                 .ok()?;

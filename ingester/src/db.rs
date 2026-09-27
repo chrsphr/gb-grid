@@ -50,8 +50,25 @@ impl ToSql for Value {
         match self {
             Value::Null => Ok(IsNull::Yes),
             Value::Bool(b) => b.to_sql(ty, out),
-            Value::Int(i) => i.to_sql(ty, out),
-            Value::Float(f) => f.to_sql(ty, out),
+            Value::Int(i) => {
+                // Columns vary in width (settlement_period is SMALLINT/int2,
+                // acceptance_id is BIGINT/int8); the i64 impl always formats
+                // int8 and Postgres rejects it for narrower targets.
+                if *ty == Type::INT2 {
+                    (*i as i16).to_sql(ty, out)
+                } else if *ty == Type::INT4 {
+                    (*i as i32).to_sql(ty, out)
+                } else {
+                    i.to_sql(ty, out)
+                }
+            }
+            Value::Float(f) => {
+                if *ty == Type::FLOAT4 {
+                    (*f as f32).to_sql(ty, out)
+                } else {
+                    f.to_sql(ty, out)
+                }
+            }
             Value::Text(s) => s.to_sql(ty, out),
             Value::Date(d) => d.to_sql(ty, out),
             Value::Timestamp(t) => t.to_sql(ty, out),
@@ -291,7 +308,10 @@ pub async fn get_watermark(conn: &Client, dataset: &str) -> Result<Option<NaiveD
 /// tokio-postgres executes statements in autocommit by default, so a bare
 /// `execute` is correct here. The cagg name is an internal constant (never user
 /// input) and is interpolated directly: the procedure's first argument is a
-/// `regclass` and so cannot be a bind parameter.
+/// `regclass` and so cannot be a bind parameter. The time params are cast
+/// explicitly because the procedure has overloads and Postgres cannot otherwise
+/// infer `$1`'s type; naive-UTC timestamps are passed as `timestamp`, matching
+/// the Python (psycopg) behaviour.
 pub async fn refresh_continuous_aggregate(
     conn: &Client,
     cagg: &str,
@@ -299,7 +319,7 @@ pub async fn refresh_continuous_aggregate(
     end: NaiveDateTime,
 ) -> Result<()> {
     conn.execute(
-        &format!("CALL refresh_continuous_aggregate('{cagg}', $1, $2)"),
+        &format!("CALL refresh_continuous_aggregate('{cagg}', $1::timestamp, $2::timestamp)"),
         &[&start, &end],
     )
     .await?;
@@ -318,14 +338,45 @@ pub async fn refresh_caggs(
     Ok(())
 }
 
+/// Date-typed variant for continuous aggregates bucketed on a DATE column
+/// (the b1610 caggs bucket `settlement_date`); passing a timestamp to those
+/// errors with "invalid time argument type".
+pub async fn refresh_continuous_aggregate_dates(
+    conn: &Client,
+    cagg: &str,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Result<()> {
+    conn.execute(
+        &format!("CALL refresh_continuous_aggregate('{cagg}', $1::date, $2::date)"),
+        &[&start, &end],
+    )
+    .await?;
+    Ok(())
+}
+
+pub async fn refresh_caggs_dates(
+    conn: &Client,
+    caggs: &[&str],
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Result<()> {
+    for cagg in caggs {
+        refresh_continuous_aggregate_dates(conn, cagg, start, end).await?;
+    }
+    Ok(())
+}
+
 pub struct TableStats {
     pub table: String,
     pub rows: i64,
-    pub latest: Option<NaiveDateTime>,
+    /// Rendered `max(ts_col)` (a `DATE` column like `b1610.settlement_date`
+    /// would otherwise fail to deserialize as a timestamp).
+    pub latest: Option<String>,
 }
 
 pub async fn table_stats(conn: &Client, table: &str, ts_col: &str) -> Result<TableStats> {
-    let sql = format!("SELECT count(*)::bigint AS rows, max({ts_col}) FROM {table}");
+    let sql = format!("SELECT count(*)::bigint AS rows, max({ts_col})::text FROM {table}");
     let row = conn.query_one(&sql, &[]).await?;
     Ok(TableStats {
         table: table.to_string(),
