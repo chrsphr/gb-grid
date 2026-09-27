@@ -40,9 +40,23 @@
 
           doCheck = false;
         };
+
+        gb-grid-ingest = pkgs.rustPlatform.buildRustPackage {
+          pname = "gb-grid-ingest";
+          version = "0.1.0";
+          src = ./ingester;
+          cargoLock.lockFile = ./ingester/Cargo.lock;
+
+          # The tests need a live Postgres (plus the Python `gb-grid migrate`
+          # to bootstrap a scratch DB) and so are exercised in the devShell /
+          # CI, not the sandboxed nix build.
+          doCheck = false;
+        };
       in {
         packages.default = gb-grid;
         packages.gb-grid = gb-grid;
+        packages.ingester = gb-grid-ingest;
+        packages.gb-grid-ingest = gb-grid-ingest;
 
         # Toolchain-only dev shell. The services (Postgres + Grafana) come from
         # docker-compose — the single source of truth shared with non-Nix users

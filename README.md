@@ -201,6 +201,18 @@ Schema lives in `src/gb_grid/migrations/` as numbered SQL files, applied with
 | `GB_GRID_POLL_<DATASET>_SECONDS` | Override one loop; `<DATASET>` is `FUELINST`, `BOALF`, `B1610`, `PN`, `MELS`, `SYSTEM_PRICES`, `MATERIALIZE`, `MATERIALIZE_DAILY` | `GB_GRID_POLL_SECONDS` |
 
 ## Deployment
+
+The ingest + materialize pipelines are also available as a standalone Rust
+binary, `gb-grid-ingest` (`ingester/`, package `.#gb-grid-ingest`), which
+replaces the Python `run` / `backfill` / `materialize-*` / `refresh-*` /
+`status` commands with the same behaviour and semantics. It's ~15–18× cheaper
+on materialize CPU and ~3× on wall-clock, with byte-identical output (see
+`bench/RESULTS.md`). Python is retained for `gb-grid migrate` (migration 0004 is
+a Python step). The `nixosModules.default` module uses the Rust ingester
+automatically when you pass it as `specialArgs.gb-grid-ingest-pkg`; without it
+it falls back to the Python ingester. `nix develop` now includes `cargo` +
+`rustc`, and the golden-equivalence benchmark is `bench/rs_vs_py/golden_materialize.sh`.
+
 I've deployed this myself in "production" at home using nixos on proxmox — you can see
 [`nix-config/gb-grid.nix`](https://github.com/chrsphr/nix-config) as an example for the host
 recipe. The flake exposes `packages.default` (the Python app) for downstream

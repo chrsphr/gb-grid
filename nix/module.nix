@@ -1,4 +1,4 @@
-{ config, lib, pkgs, gb-grid-pkg, ... }:
+{ config, lib, pkgs, gb-grid-pkg, gb-grid-ingest-pkg ? null, ... }:
 
 let
   cfg = config.services.gb-grid;
@@ -6,6 +6,15 @@ let
   dbUser = "gb_grid";
   appHome = "/var/lib/gb-grid";
   dashboardsDir = ./../grafana/dashboards;
+
+  # The Rust ingester (pass via specialArgs `gb-grid-ingest-pkg`) replaces the
+  # Python scheduler/ingest side; migrations still run through the Python
+  # package (0004 is a Python yoyo step). Falls back to the Python ingester
+  # when the Rust package isn't supplied, so existing consumers keep working.
+  ingestBin = if gb-grid-ingest-pkg != null
+    then "${gb-grid-ingest-pkg}/bin/gb-grid-ingest"
+    else "${gb-grid-pkg}/bin/gb-grid";
+  migrateBin = "${gb-grid-pkg}/bin/gb-grid";
 
   # TimescaleDB is under the (unfree) TSL licence. Allow just that one package
   # via a scoped pkgs import so consumers don't need host-wide allowUnfree.
@@ -125,8 +134,8 @@ in {
         User = dbUser;
         Group = dbUser;
         WorkingDirectory = appHome;
-        ExecStartPre = "${gb-grid-pkg}/bin/gb-grid migrate";
-        ExecStart = "${gb-grid-pkg}/bin/gb-grid run";
+        ExecStartPre = "${migrateBin} migrate";
+        ExecStart = "${ingestBin} run";
         # The TimescaleDB hypertable conversion (migration 0009) rewrites the
         # large tables under migrate_data and takes minutes; without this the
         # default 90s start timeout would kill it mid-conversion.
@@ -153,7 +162,7 @@ in {
         User = dbUser;
         Group = dbUser;
         WorkingDirectory = appHome;
-        ExecStart = "${gb-grid-pkg}/bin/gb-grid refresh-constraints";
+        ExecStart = "${ingestBin} refresh-constraints";
         NoNewPrivileges = true;
         PrivateTmp = true;
         ProtectSystem = "strict";
