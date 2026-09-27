@@ -55,6 +55,8 @@
             postgresql_16   # psql / pg_isready / pg_dump client tools
             just
             ruff
+            cargo
+            rustc
             stdenv.cc.cc.lib   # libstdc++.so.6 for prebuilt wheels (pyzmq, etc.)
             zlib
           ];
