@@ -24,7 +24,40 @@ let
       allowUnfreePredicate = p: builtins.elem (lib.getName p) [ "timescaledb" ];
     };
   };
-  pgPackage = tsPkgs.postgresql_16.withPackages (p: [ p.timescaledb ]);
+  # TimescaleDB older than 2.32.1 breaks on PostgreSQL >= 16.16 / 17.12 / 18.7.
+  # Every job the background scheduler runs (CAGG refresh and compression
+  # policies) is recorded as failed with `cannot drop portal "" while it is
+  # being set up` and backed off (timescale/timescaledb#11038, fixed by #11015
+  # in 2.32.1). nixos-26.05 ships 2.27.1 with PostgreSQL 16.16, so until the
+  # pinned nixpkgs has >= 2.32.1, build 2.32.1 with nixpkgs' own derivation
+  # (master's recipe differs only in version and hash). This turns itself
+  # off once nixpkgs catches up.
+  timescaledbFor = p:
+    if lib.versionAtLeast p.timescaledb.version "2.32.1" then p.timescaledb
+    else p.timescaledb.overrideAttrs (old: {
+      version = "2.32.1";
+      src = old.src.override {
+        tag = "2.32.1";
+        hash = "sha256-UzYCXd+F4pVC1q1gmrU1OakgLDYxO3mu6TkZnuAKuAg=";
+      };
+    });
+  pgPackage = tsPkgs.postgresql_16.withPackages (p: [ (timescaledbFor p) ]);
+
+  # After a TimescaleDB package change, every session in the DB fails with
+  # `could not access file "$libdir/timescaledb-<old>"` until the extension is
+  # updated, and the update must be the session's first statement. So run it
+  # before migrate on every start. It's a no-op when already current (just a
+  # notice), and skipped on a fresh DB where migrate hasn't created the
+  # extension yet. Runs as gb_grid, the extension's owner.
+  timescaledbUpdate = pkgs.writeShellScript "gb-grid-timescaledb-update" ''
+    out=$(${pgPackage}/bin/psql -X -d ${dbName} -v ON_ERROR_STOP=1 \
+      -c 'ALTER EXTENSION timescaledb UPDATE' 2>&1) && { echo "$out"; exit 0; }
+    case "$out" in
+      *'extension "timescaledb" does not exist'*) echo "timescaledb not installed yet; skipping update"; exit 0 ;;
+    esac
+    echo "$out" >&2
+    exit 1
+  '';
 in {
   options.services.gb-grid = {
     enable = lib.mkEnableOption "GB-grid ingester, Postgres, and Grafana";
@@ -134,7 +167,7 @@ in {
         User = dbUser;
         Group = dbUser;
         WorkingDirectory = appHome;
-        ExecStartPre = "${migrateBin} migrate";
+        ExecStartPre = [ "${timescaledbUpdate}" "${migrateBin} migrate" ];
         ExecStart = "${ingestBin} run";
         # The TimescaleDB hypertable conversion (migration 0009) rewrites the
         # large tables under migrate_data and takes minutes; without this the
