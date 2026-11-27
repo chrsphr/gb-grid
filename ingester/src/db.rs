@@ -84,10 +84,70 @@ impl ToSql for Value {
     tokio_postgres::types::to_sql_checked!();
 }
 
+/// Unix socket directories libpq builds tend to default to (NixOS, Debian,
+/// upstream). The first one holding the port's socket wins.
+const SOCKET_DIRS: [&str; 3] = ["/run/postgresql", "/var/run/postgresql", "/tmp"];
+
+/// Parse a connection URL and fill in the defaults libpq would apply but
+/// tokio-postgres does not.
+///
+/// The NixOS module passes `postgresql:///gb_grid` (peer auth over the local
+/// socket). libpq resolves that to the socket directory and the OS user, while
+/// tokio-postgres fails with "both host and hostaddr are missing". Order
+/// follows libpq: anything in the URL wins, then `PGHOST`/`PGPORT`/`PGUSER`/
+/// `PGPASSWORD`. Then the host falls back to the first [`SOCKET_DIRS`] entry
+/// holding `.s.PGSQL.<port>`, and the user falls back to `USER`/`LOGNAME`
+/// (systemd sets both for `User=` services).
+///
+/// `getenv` and `exists` are injected so this can be tested without touching
+/// the process environment or filesystem.
+pub fn pg_config(
+    url: &str,
+    getenv: impl Fn(&str) -> Option<String>,
+    exists: impl Fn(&std::path::Path) -> bool,
+) -> Result<tokio_postgres::Config> {
+    let env = |k: &str| getenv(k).filter(|v| !v.is_empty());
+    let mut pg: tokio_postgres::Config =
+        url.parse().context("parse GB_GRID_DATABASE_URL")?;
+
+    if pg.get_ports().is_empty() {
+        if let Some(port) = env("PGPORT") {
+            pg.port(port.parse().with_context(|| format!("invalid PGPORT {port:?}"))?);
+        }
+    }
+    if pg.get_hosts().is_empty() && pg.get_hostaddrs().is_empty() {
+        match env("PGHOST") {
+            Some(hosts) => hosts.split(',').for_each(|h| {
+                pg.host(h.trim());
+            }),
+            None => {
+                let port = pg.get_ports().first().copied().unwrap_or(5432);
+                let dir = SOCKET_DIRS
+                    .iter()
+                    .find(|d| exists(&std::path::Path::new(d).join(format!(".s.PGSQL.{port}"))))
+                    .unwrap_or(&SOCKET_DIRS[0]);
+                pg.host(*dir);
+            }
+        }
+    }
+    if pg.get_user().is_none() {
+        let user = ["PGUSER", "USER", "LOGNAME"]
+            .iter()
+            .find_map(|k| env(k))
+            .context("no user in the database URL and none of PGUSER/USER/LOGNAME is set")?;
+        pg.user(user);
+    }
+    if pg.get_password().is_none() {
+        if let Some(pw) = env("PGPASSWORD") {
+            pg.password(pw);
+        }
+    }
+    Ok(pg)
+}
+
 pub async fn connect(cfg: &Config) -> Result<Client> {
-    let (client, connection) = tokio_postgres::connect(&cfg.database_url, NoTls)
-        .await
-        .context("connect to postgres")?;
+    let pg = pg_config(&cfg.database_url, |k| std::env::var(k).ok(), |p| p.exists())?;
+    let (client, connection) = pg.connect(NoTls).await.context("connect to postgres")?;
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("postgres connection error: {e}");
