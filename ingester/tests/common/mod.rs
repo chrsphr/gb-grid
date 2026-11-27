@@ -136,3 +136,9 @@ pub async fn truncate(conn: &Client, tables: &[&str]) {
             .unwrap_or_else(|e| panic!("truncate {t}: {e}"));
     }
 }
+/// Run `gb-grid migrate` against the scratch database again (it re-applies the
+/// post-apply hooks even when no migration is pending).
+pub fn migrate_again() -> Result<()> {
+    let url = url().context("no scratch database")?;
+    migrate(&url)
+}

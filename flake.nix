@@ -52,11 +52,29 @@
           # CI, not the sandboxed nix build.
           doCheck = false;
         };
+
+        # The web UI: a static SvelteKit build (HTML/JS/CSS, plus .gz/.br
+        # siblings). Served by nginx in the NixOS module, which also proxies
+        # /api to PostgREST. Update npmDepsHash after changing
+        # web/package-lock.json (`prefetch-npm-deps web/package-lock.json`).
+        gb-grid-web = pkgs.buildNpmPackage {
+          pname = "gb-grid-web";
+          version = "0.1.0";
+          src = ./web;
+          nodejs = pkgs.nodejs_22;
+          npmDepsHash = "sha256-FNpMVnzeB3agN6o+SqX1uzPbgxWnyzlTuaQT8tkbyPU=";
+          installPhase = ''
+            runHook preInstall
+            cp -r build $out
+            runHook postInstall
+          '';
+        };
       in {
         packages.default = gb-grid;
         packages.gb-grid = gb-grid;
         packages.ingester = gb-grid-ingest;
         packages.gb-grid-ingest = gb-grid-ingest;
+        packages.gb-grid-web = gb-grid-web;
 
         # Toolchain-only dev shell. The services (Postgres + Grafana) come from
         # docker-compose — the single source of truth shared with non-Nix users
@@ -71,6 +89,7 @@
             ruff
             cargo
             rustc
+            nodejs_22   # web UI (web/): npm run dev / build / check
             stdenv.cc.cc.lib   # libstdc++.so.6 for prebuilt wheels (pyzmq, etc.)
             zlib
           ];
@@ -96,8 +115,8 @@
 
             # Bring up the data services via the one orchestrator: docker compose.
             if command -v docker >/dev/null 2>&1; then
-              echo "[gb-grid] starting db + grafana via docker compose"
-              docker compose up -d db grafana >/dev/null 2>&1 || \
+              echo "[gb-grid] starting db + postgrest + grafana via docker compose"
+              docker compose up -d db postgrest grafana >/dev/null 2>&1 || \
                 echo "[gb-grid] 'docker compose up' failed — is the docker daemon running?"
               # Wait for Postgres to accept connections before migrating.
               for _ in $(seq 1 30); do
@@ -119,7 +138,8 @@
               gb-grid migrate >/dev/null 2>&1 || true
             fi
 
-            echo "gb-grid devShell — db on $PGHOST:$PGPORT (docker compose), grafana on http://localhost:3000"
+            echo "gb-grid devShell — db on $PGHOST:$PGPORT, API on http://127.0.0.1:3001, grafana on http://localhost:3000"
+            echo "  web UI: cd web && npm install && npm run dev   (http://localhost:5173)"
           '';
         };
       }) // {

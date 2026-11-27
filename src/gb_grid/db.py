@@ -32,13 +32,24 @@ def connect(url: str | None = None) -> psycopg.Connection:
 
 
 def migrate(url: str | None = None) -> int:
-    """Apply all pending yoyo migrations. Returns the number applied."""
+    """Apply all pending yoyo migrations, then the post-apply hooks.
+
+    Returns the number of migrations applied. The post-apply hooks
+    (``migrations/post-apply*.sql``, e.g. the web UI's ``api`` schema) run on
+    every call, not only when a migration was pending, so editing a hook takes
+    effect on the next ``migrate``.
+    """
     backend = get_backend(_resolve_url(url))
     migrations = read_migrations(str(MIGRATIONS_DIR))
     to_apply = backend.to_apply(migrations)
     n = len(list(to_apply))
     with backend.lock():
-        backend.apply_migrations(backend.to_apply(migrations))
+        pending = backend.to_apply(migrations)
+        if pending:
+            # yoyo runs the post-apply hooks itself after applying migrations.
+            backend.apply_migrations(pending)
+        else:
+            backend.run_post_apply(migrations)
     return n
 
 

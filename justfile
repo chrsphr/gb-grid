@@ -43,3 +43,11 @@ docker-backfill FROM TO *DATASETS:
 
 docker-logs:
     docker compose logs -f app
+
+# --- Web UI (web/) ---
+
+web-dev:
+    cd web && npm install && npm run dev
+
+web-check:
+    cd web && npm run check && npm test

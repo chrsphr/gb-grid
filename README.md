@@ -29,13 +29,15 @@ there's a dev shell layered on the same services.
 
 ## Quick start
 
-The whole stack runs through `docker compose` — Postgres (TimescaleDB), Grafana
-(provisioned with the dashboards), and the ingester.
+The whole stack runs through `docker compose`: Postgres (TimescaleDB), the
+ingester, the web UI with its read API (PostgREST), and Grafana (provisioned
+with the original dashboards, while the web UI replaces them).
 
 ```bash
 docker compose up -d --build          # or: just docker-up
 docker compose run --rm app gb-grid backfill --from 2026-04-01 --to 2026-05-01
 docker compose run --rm app gb-grid materialize-dispatch --from 2026-04-01 --to 2026-05-01
+open http://localhost:8080            # the web UI
 open http://localhost:3000            # Grafana — anonymous Editor; admin/admin to log in
 ```
 
@@ -62,7 +64,7 @@ migrations then runs the always-on ingester; one-off CLI commands run as
 `nix develop` is a thin toolchain shell (cargo/rustc, Python + uv for migrations
 and the golden tests, ruff, just, psql client)
 layered on top of the **same** Docker services — it is not a second way to run
-the stack. Entering it runs `docker compose up -d db grafana`, syncs `.venv`,
+the stack. Entering it runs `docker compose up -d db postgrest grafana`, syncs `.venv`,
 and applies migrations, with `GB_GRID_DATABASE_URL` and the `PG*` vars pointed at
 the compose Postgres (`127.0.0.1:5433`, user/password `gb_grid`/`gbgrid`). So
 `psql`, `pg_dump`, GUI clients, the test suite, and the CLI all run natively
@@ -165,6 +167,47 @@ migrations, and migration 0004 is a Python step. The rest of the Python CLI
 kept only as the reference implementation for the golden-equivalence scripts in
 `bench/rs_vs_py/`.
 
+## Web UI
+
+`web/` is a SvelteKit single-page app (Svelte 5, Tailwind, shadcn-svelte,
+ECharts, MapLibre). It has four views:
+
+- **Dispatch:** one station's planned, dispatched, MEL and metered output, the
+  output of each of its units, and the system operator's turn-up and curtailment.
+  Pick the station from the list or the map.
+- **Output:** national generation by fuel, then a heatmap per fuel type with a
+  row per station, north at the top.
+- **Annual:** a calendar of daily energy per metric for any selection of fuels
+  and stations, in MWh or as a share of capacity.
+- **Constraints:** NESO day-ahead flows against limits for each boundary.
+
+Every filter and time window lives in the URL, so any view can be shared as a
+link. Drag across a time chart to zoom in.
+
+The browser reads from [PostgREST](https://postgrest.org), which serves the
+database's `api` schema: a set of read-only SQL functions, one per view's query,
+defined in `src/gb_grid/migrations/post-apply.api.sql`. Each is a GET on
+`/api/rpc/<function>`, for example:
+
+```bash
+curl 'http://localhost:8080/api/rpc/dispatch_series?station=SGRWO&start_ts=2026-05-13T00:00Z&end_ts=2026-05-14T00:00Z&step=30%20minutes'
+```
+
+To work on it, start the stack (`nix develop`, or `docker compose up -d db
+postgrest`), then:
+
+```bash
+cd web
+npm install
+npm run dev        # http://localhost:5173; /api is proxied to PostgREST on :3001
+npm run check      # type-check
+npm test           # unit tests
+```
+
+A new view is usually a new function in `post-apply.api.sql` plus a page in
+`web/src/routes/`. `ingester/tests/test_api_schema.rs` calls each function as
+PostgREST's role and compares it with the original Grafana query.
+
 ## Dashboards
 
 `docker compose` runs Grafana on <http://localhost:3000> (anonymous Editor
@@ -226,6 +269,10 @@ In production the NixOS module runs `ALTER EXTENSION timescaledb UPDATE`, then
 been merged. To correct one, add a new migration that supersedes it (as 0016
 does for 0015).
 
+`post-apply.api.sql` is the exception: it's a yoyo post-apply hook, not a
+migration. `gb-grid migrate` re-runs it on every invocation, and it rebuilds the
+web UI's `api` schema from scratch, so edit it in place.
+
 ## Configuration
 
 | Env var | Purpose | Default |
@@ -248,6 +295,12 @@ does for 0015).
   required for `gb-grid migrate`.
 - **Start-up:** the service runs `ALTER EXTENSION timescaledb UPDATE`, then
   `gb-grid migrate`, then the ingester.
+- **Web UI:** pass `packages.gb-grid-web` as `specialArgs.gb-grid-web-pkg` and
+  the module serves it with nginx on `services.gb-grid.web.port` (default
+  8080, opened in the firewall unless `web.openFirewall = false`). nginx proxies
+  `/api` to PostgREST on a Unix socket. PostgREST logs in as the `postgrest`
+  database role and runs requests as the read-only `web_anon` role, which
+  `gb-grid migrate` creates (the module gives `gb_grid` CREATEROLE for that).
 - **TimescaleDB version:** the module builds TimescaleDB ≥ 2.32.1, because
   nixos-26.05's 2.27.1 makes every TimescaleDB background job fail on
   PostgreSQL ≥ 16.16. The override drops itself once nixpkgs catches up.
