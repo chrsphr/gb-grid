@@ -8,11 +8,12 @@
 //!   `ingest_http_cache` table; a 304 means unchanged → return 0 rows and do
 //!   **not** touch the cached validators.
 //! - Drop the UTF-8 BOM from the first line so the header parses.
-//! - Parse `Date (GMT/BST)` as Europe/London wall-clock → naive UTC, memoised on
+//! - Parse the `Date_ Time GMT_BST` (formerly `Date (GMT/BST)`) column as Europe/London wall-clock → naive UTC, memoised on
 //!   the raw string (each timestamp repeats across every constraint group).
 //! - Filter `ts <= last_ts` (the high-water mark = `MAX(ts)` from the table)
 //!   *before* building rows — on a daily refresh nearly all rows are dropped.
-//! - `Limit (MW)` / `Flow (MW)` → float-or-null; skip rows that fail to parse.
+//! - `Limit_MW` / `Flow_MW` → float-or-null; skip rows that fail to parse. A
+//!   missing column is an error (it used to skip every row silently).
 //! - On success, persist the new validators back into `ingest_http_cache`.
 //! - Upsert via `db::upsert` with table `constraints`, conflict `constraint_group, ts`.
 //!
@@ -24,7 +25,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::{LocalResult, NaiveDateTime, TimeZone};
 use chrono_tz::Europe::London;
 use csv::ReaderBuilder;
@@ -38,10 +39,14 @@ pub const CSV_URL: &str = "https://api.neso.energy/dataset/cf3cbc92-2d5d-4c2b-bd
 pub const TABLE: &str = "constraints";
 pub const CONFLICT: [&str; 2] = ["constraint_group", "ts"];
 
-const HDR_DATE: &str = "Date (GMT/BST)";
-const HDR_GROUP: &str = "Constraint Group";
-const HDR_LIMIT: &str = "Limit (MW)";
-const HDR_FLOW: &str = "Flow (MW)";
+// CSV column names, current spelling first. As of Nov 2026 NESO publishes
+// `Date_ Time GMT_BST` / `Limit_MW` / `Flow_MW` with ISO `T` timestamps; older
+// copies used the parenthesised names. A missing column is a hard error. Skipping
+// every row instead is how the rename went unnoticed (0 rows, no failure).
+const HDR_GROUP: &[&str] = &["Constraint Group"];
+const HDR_DATE: &[&str] = &["Date_ Time GMT_BST", "Date (GMT/BST)"];
+const HDR_LIMIT: &[&str] = &["Limit_MW", "Limit (MW)"];
+const HDR_FLOW: &[&str] = &["Flow_MW", "Flow (MW)"];
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -106,7 +111,7 @@ pub async fn refresh_from_url(cfg: &Config, url: &str) -> Result<usize> {
         .map(str::to_string);
 
     let body = resp.bytes().await.context("read constraints body")?;
-    let rows = parse_rows(&body, last_ts);
+    let rows = parse_rows(&body, last_ts)?;
 
     conn.execute(
         "INSERT INTO ingest_http_cache(url, etag, last_modified, fetched_at) \
@@ -141,30 +146,34 @@ pub async fn refresh_from_url(cfg: &Config, url: &str) -> Result<usize> {
 ///
 /// Exposed as `pub` so the integration test suite can exercise the parse core
 /// directly; `cmd_refresh_constraints` is the only production caller.
-pub fn parse_rows(bytes: &[u8], last_ts: Option<NaiveDateTime>) -> Vec<Row> {
+pub fn parse_rows(bytes: &[u8], last_ts: Option<NaiveDateTime>) -> Result<Vec<Row>> {
     let bytes = strip_bom(bytes);
     let mut cache: HashMap<String, NaiveDateTime> = HashMap::new();
 
     let mut rdr = ReaderBuilder::new().has_headers(true).from_reader(bytes);
-    let headers = match rdr.headers() {
-        Ok(h) => h.clone(),
-        Err(_) => return Vec::new(),
+    let headers = rdr.headers().context("read constraints CSV header")?.clone();
+    let column = |options: &[&str]| -> Result<usize> {
+        options
+            .iter()
+            .find_map(|o| headers.iter().position(|h| h == *o))
+            .ok_or_else(|| {
+                anyhow!(
+                    "constraints CSV has no {} column; header is {:?}",
+                    options.join(" / "),
+                    headers.iter().collect::<Vec<_>>()
+                )
+            })
     };
-    let idx_date = headers.iter().position(|h| h == HDR_DATE);
-    let idx_group = headers.iter().position(|h| h == HDR_GROUP);
-    let idx_limit = headers.iter().position(|h| h == HDR_LIMIT);
-    let idx_flow = headers.iter().position(|h| h == HDR_FLOW);
+    let i_date = column(HDR_DATE)?;
+    let i_group = column(HDR_GROUP)?;
+    let i_limit = column(HDR_LIMIT)?;
+    let i_flow = column(HDR_FLOW)?;
 
     let mut rows: Vec<Row> = Vec::new();
     for rec in rdr.records() {
         let rec = match rec {
             Ok(r) => r,
             Err(_) => continue,
-        };
-        let (Some(i_date), Some(i_group), Some(i_limit), Some(i_flow)) =
-            (idx_date, idx_group, idx_limit, idx_flow)
-        else {
-            continue;
         };
         let Some(ts) = parse_ts(rec.get(i_date).unwrap_or("").trim(), &mut cache) else {
             continue;
@@ -188,7 +197,7 @@ pub fn parse_rows(bytes: &[u8], last_ts: Option<NaiveDateTime>) -> Vec<Row> {
             flow.map(Value::f).unwrap_or(Value::Null),
         ]);
     }
-    rows
+    Ok(rows)
 }
 
 /// Parse a GMT/BST wall-clock timestamp to naive UTC, memoised on the raw
@@ -197,7 +206,18 @@ fn parse_ts(raw: &str, cache: &mut HashMap<String, NaiveDateTime>) -> Option<Nai
     if let Some(ts) = cache.get(raw) {
         return Some(*ts);
     }
-    let naive = NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S").ok()?;
+    // The forms Python's `datetime.fromisoformat` accepts and the file has
+    // used: `T` or space separator, with or without seconds (~11% of the
+    // current file is `2023-10-28T00:00`), optional fractional seconds.
+    const FORMATS: [&str; 4] = [
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d %H:%M",
+    ];
+    let naive = FORMATS
+        .iter()
+        .find_map(|f| NaiveDateTime::parse_from_str(raw, f).ok())?;
     let ts = london_to_utc(naive);
     if let Some(ts) = ts {
         cache.insert(raw.to_string(), ts);

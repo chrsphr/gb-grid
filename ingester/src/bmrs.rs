@@ -234,16 +234,18 @@ pub async fn fetch_b1610(
     start: NaiveDate,
     end: NaiveDate,
 ) -> Result<(Vec<String>, Vec<Row>)> {
-    // The API's from/to are instants; a bare date only returns settlement
-    // period 1, so send the full-day datetime span.
-    let start_dt = start.and_hms_opt(0, 0, 0).expect("valid midnight");
-    let end_dt = end.and_hms_opt(23, 59, 59).expect("valid 23:59:59");
+    // Filtered by settlement date (the endpoint stopped accepting from/to in
+    // Nov 2026). The range runs from period 1 of `start` to period 50 of `end`.
+    // Without the period bounds, settlementDateTo only reaches period 1 of the
+    // end date. 50 covers the long fall-back day.
     let payload = client
         .get(
             "/datasets/B1610/stream",
             &[
-                ("from", iso(start_dt)),
-                ("to", iso(end_dt)),
+                ("settlementDateFrom", start.format("%Y-%m-%d").to_string()),
+                ("settlementDateTo", end.format("%Y-%m-%d").to_string()),
+                ("settlementPeriodFrom", "1".to_string()),
+                ("settlementPeriodTo", "50".to_string()),
                 ("format", "json".to_string()),
             ],
         )

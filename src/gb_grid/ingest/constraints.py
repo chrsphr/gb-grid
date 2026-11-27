@@ -8,7 +8,7 @@ the new rows rather than re-processing the entire file.
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -29,6 +29,31 @@ CSV_URL = (
 TABLE = "constraints"
 CONFLICT = ["constraint_group", "ts"]
 _LONDON = ZoneInfo("Europe/London")
+
+# CSV column names, current spelling first. As of Nov 2026 NESO publishes
+# `Date_ Time GMT_BST` / `Limit_MW` / `Flow_MW` with ISO `T` timestamps; older
+# copies used the parenthesised names. A missing column is a hard error. Skipping
+# every row instead is how the rename went unnoticed (0 rows, no failure).
+_COLUMNS = {
+    "group": ("Constraint Group",),
+    "ts": ("Date_ Time GMT_BST", "Date (GMT/BST)"),
+    "limit": ("Limit_MW", "Limit (MW)"),
+    "flow": ("Flow_MW", "Flow (MW)"),
+}
+
+
+def _resolve_columns(fieldnames: Sequence[str] | None) -> dict[str, str]:
+    present = set(fieldnames or ())
+    out: dict[str, str] = {}
+    for key, options in _COLUMNS.items():
+        hit = next((o for o in options if o in present), None)
+        if hit is None:
+            raise ValueError(
+                f"constraints CSV has no {' / '.join(options)} column; "
+                f"header is {sorted(present)}"
+            )
+        out[key] = hit
+    return out
 
 
 _TS_CACHE: dict[str, datetime] = {}
@@ -109,16 +134,17 @@ def _stream_rows(
             return None
         resp.raise_for_status()
         reader = csv.DictReader(_strip_bom(resp.iter_lines()))
+        col = _resolve_columns(reader.fieldnames)
         for r in reader:
             try:
-                ts = _parse_ts(r["Date (GMT/BST)"].strip())
+                ts = _parse_ts(r[col["ts"]].strip())
                 if last_ts is not None and ts <= last_ts:
                     continue
                 rows.append({
-                    "constraint_group": r["Constraint Group"].strip(),
+                    "constraint_group": r[col["group"]].strip(),
                     "ts":               ts,
-                    "limit_mw":         _float_or_none(r["Limit (MW)"]),
-                    "flow_mw":          _float_or_none(r["Flow (MW)"]),
+                    "limit_mw":         _float_or_none(r[col["limit"]]),
+                    "flow_mw":          _float_or_none(r[col["flow"]]),
                 })
             except (KeyError, ValueError, AttributeError):
                 continue

@@ -221,14 +221,17 @@ async fn fetch_fuelinst_maps_spellings_and_skips_bad_rows() {
 }
 
 #[tokio::test]
-async fn fetch_b1610_sends_full_day_instants() {
+async fn fetch_b1610_sends_settlement_date_and_full_period_range() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/datasets/B1610/stream"))
-        // The API's from/to are instants; a bare date would only return
-        // settlement period 1. Assert the full-day span is sent.
-        .and(query_param("from", "2026-06-10T00:00:00Z"))
-        .and(query_param("to", "2026-06-10T23:59:59Z"))
+        // The endpoint rejects from/to (400). Without the period bounds,
+        // settlementDateTo would only reach period 1 of the end date; 50 covers
+        // the long fall-back day.
+        .and(query_param("settlementDateFrom", "2026-06-10"))
+        .and(query_param("settlementDateTo", "2026-06-10"))
+        .and(query_param("settlementPeriodFrom", "1"))
+        .and(query_param("settlementPeriodTo", "50"))
         .and(query_param("format", "json"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!([
             {
