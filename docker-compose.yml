@@ -42,6 +42,38 @@ services:
     command: ["sh", "-c", "gb-grid migrate && gb-grid run"]
     restart: unless-stopped
 
+  # Read API for the web UI: serves the `api` schema's functions as
+  # /rpc/<name>. The schema and the web_anon role are created by
+  # `gb-grid migrate` (post-apply hook); PostgREST retries until they exist.
+  # Logs in as gb_grid (a superuser here) and runs each request as web_anon.
+  # Pinned to the version nixpkgs ships, which the NixOS module runs.
+  postgrest:
+    image: postgrest/postgrest:v14.1
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgresql://gb_grid:${POSTGRES_PASSWORD:-gbgrid}@db:5432/gb_grid
+      PGRST_DB_SCHEMAS: api
+      PGRST_DB_ANON_ROLE: web_anon
+      PGRST_DB_CHANNEL_ENABLED: "true"
+      PGRST_OPENAPI_MODE: ignore-privileges
+    ports:
+      # Loopback only: the web UI (or `npm run dev`) proxies /api to it.
+      - "127.0.0.1:${POSTGREST_PORT:-3001}:3000"
+    restart: unless-stopped
+
+  # The web UI: the static SvelteKit build behind nginx, which also proxies
+  # /api to PostgREST.
+  web:
+    build: ./web
+    image: gb-grid-web:local
+    depends_on:
+      - postgrest
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.3.1
     depends_on:

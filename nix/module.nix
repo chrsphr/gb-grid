@@ -1,6 +1,12 @@
-{ config, lib, pkgs, gb-grid-pkg, gb-grid-ingest-pkg ? null, ... }:
+{ config, lib, pkgs, gb-grid-pkg, ... }@args:
 
 let
+  # Optional packages, passed via specialArgs. (Read through `args`: the module
+  # system ignores `? null` defaults on module function arguments, so a missing
+  # one would fail evaluation instead of falling back.)
+  gb-grid-ingest-pkg = args.gb-grid-ingest-pkg or null;
+  gb-grid-web-pkg = args.gb-grid-web-pkg or null;
+
   cfg = config.services.gb-grid;
   dbName = "gb_grid";
   dbUser = "gb_grid";
@@ -72,9 +78,34 @@ in {
       default = true;
       description = "Open the Grafana port in the host firewall.";
     };
+
+    web = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = gb-grid-web-pkg != null;
+        defaultText = lib.literalExpression "gb-grid-web-pkg != null";
+        description = ''
+          Serve the web UI (pass packages.gb-grid-web as specialArgs
+          `gb-grid-web-pkg`): nginx on `web.port` serves the static build and
+          proxies /api to PostgREST, which exposes the database's `api` schema.
+        '';
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 8080;
+        description = "Port nginx serves the web UI on.";
+      };
+
+      openFirewall = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Open the web UI port in the host firewall.";
+      };
+    };
   };
 
-  config = lib.mkIf cfg.enable {
+  config = lib.mkIf cfg.enable (lib.mkMerge [ {
     environment.systemPackages = [ gb-grid-pkg pgPackage ];
 
     users.users.${dbUser} = {
@@ -101,6 +132,9 @@ in {
       ensureUsers = [{
         name = dbUser;
         ensureDBOwnership = true;
+        # `gb-grid migrate` creates the web API's web_anon role (see
+        # migrations/post-apply.api.sql), which needs CREATEROLE.
+        ensureClauses.createrole = lib.mkIf cfg.web.enable true;
       }];
     };
 
@@ -213,5 +247,58 @@ in {
         Persistent = true;
       };
     };
-  };
+  }
+
+  (lib.mkIf cfg.web.enable {
+    assertions = [{
+      assertion = gb-grid-web-pkg != null;
+      message = "services.gb-grid.web.enable needs the web UI package: pass packages.gb-grid-web as specialArgs.gb-grid-web-pkg.";
+    }];
+
+    # PostgREST logs in as `postgrest` over the Unix socket (peer auth; the
+    # nixpkgs module runs it as that DynamicUser) and runs each request as
+    # web_anon. `gb-grid migrate` creates web_anon, grants it to `postgrest`,
+    # and (re)builds the `api` schema, then notifies PostgREST to reload.
+    services.postgresql.ensureUsers = [{ name = "postgrest"; }];
+
+    services.postgrest = {
+      enable = true;
+      settings = {
+        db-uri = {
+          host = "/run/postgresql";
+          dbname = dbName;
+          user = "postgrest";
+        };
+        db-schemas = "api";
+        db-anon-role = "web_anon";
+        # Listens on its default Unix socket (/run/postgrest/postgrest.sock),
+        # reachable only through nginx.
+      };
+    };
+    systemd.services.postgrest = {
+      after = [ "gb-grid.service" ];
+      wants = [ "gb-grid.service" ];
+    };
+
+    services.nginx = {
+      enable = true;
+      recommendedGzipSettings = true;
+      recommendedProxySettings = true;
+      virtualHosts.gb-grid-web = {
+        listen = [{ addr = "0.0.0.0"; port = cfg.web.port; }];
+        root = gb-grid-web-pkg;
+        # The build ships .gz siblings for every asset.
+        extraConfig = "gzip_static on;";
+        locations."/api/".proxyPass = "http://unix:/run/postgrest/postgrest.sock:/";
+        locations."/_app/immutable/".extraConfig = ''
+          add_header Cache-Control "public, max-age=31536000, immutable";
+        '';
+        # Client-side routes all load the single-page app.
+        locations."/".tryFiles = "$uri /200.html";
+      };
+    };
+
+    networking.firewall.allowedTCPPorts = lib.optional cfg.web.openFirewall cfg.web.port;
+  })
+  ]);
 }

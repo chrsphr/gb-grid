@@ -6,8 +6,7 @@ Britain's electricity grid, sourced from
 official near-real-time data feed for the GB electricity balancing and
 settlement system. It downloads generation, balancing-action, and
 plant-capacity data, stores it in a [TimescaleDB](https://www.timescale.com/)
-(PostgreSQL) database, and ships a set of [Grafana](https://grafana.com/)
-dashboards on top for exploration.
+(PostgreSQL) database, and ships a web UI on top for exploration.
 
 It's aimed at anyone who wants to poke at how the GB grid actually behaves —
 energy hobbyists, researchers, students, or developers prototyping against real
@@ -18,24 +17,29 @@ balancing-mechanism data. With it you can explore questions like:
 - How is the system operator **dispatching** individual units minute to minute?
 - How does the national fuel mix (wind / gas / nuclear / interconnectors / …) shift across a day?
 
-The whole stack runs from a single `docker compose up` — Postgres, Grafana, and
-a background ingester that keeps the data current. If you use [Nix](https://nixos.org/),
+The whole stack runs from a single `docker compose up` — Postgres, the web UI,
+and a background ingester that keeps the data current. If you use [Nix](https://nixos.org/),
 there's a dev shell layered on the same services.
 
-![BMU dispatch dashboard](docs/images/bmu_dispatch.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/dispatch-dark.png">
+  <img alt="gb-grid web UI, dispatch view" src="docs/images/web/dispatch-light.png">
+</picture>
 
 > [!CAUTION]
 > This repo is almost entirely vibe-coded. Do not expect quality, but also, let me assure you it would be even worse if I attempted to write this myself.
 
 ## Quick start
 
-The whole stack runs through `docker compose` — Postgres (TimescaleDB), Grafana
-(provisioned with the dashboards), and the ingester.
+The whole stack runs through `docker compose`: Postgres (TimescaleDB), the
+ingester, the web UI with its read API (PostgREST), and the original Grafana
+dashboards, kept until the web UI is signed off.
 
 ```bash
 docker compose up -d --build          # or: just docker-up
 docker compose run --rm app gb-grid backfill --from 2026-04-01 --to 2026-05-01
 docker compose run --rm app gb-grid materialize-dispatch --from 2026-04-01 --to 2026-05-01
+open http://localhost:8080            # the web UI
 open http://localhost:3000            # Grafana — anonymous Editor; admin/admin to log in
 ```
 
@@ -62,7 +66,7 @@ migrations then runs the always-on ingester; one-off CLI commands run as
 `nix develop` is a thin toolchain shell (cargo/rustc, Python + uv for migrations
 and the golden tests, ruff, just, psql client)
 layered on top of the **same** Docker services — it is not a second way to run
-the stack. Entering it runs `docker compose up -d db grafana`, syncs `.venv`,
+the stack. Entering it runs `docker compose up -d db postgrest grafana`, syncs `.venv`,
 and applies migrations, with `GB_GRID_DATABASE_URL` and the `PG*` vars pointed at
 the compose Postgres (`127.0.0.1:5433`, user/password `gb_grid`/`gbgrid`). So
 `psql`, `pg_dump`, GUI clients, the test suite, and the CLI all run natively
@@ -165,55 +169,117 @@ migrations, and migration 0004 is a Python step. The rest of the Python CLI
 kept only as the reference implementation for the golden-equivalence scripts in
 `bench/rs_vs_py/`.
 
+## Web UI
+
+`web/` is a SvelteKit single-page app (Svelte 5, Tailwind, shadcn-svelte,
+ECharts, MapLibre). It has four views:
+
+- **Dispatch:** one station's planned, dispatched, MEL and metered output, the
+  output of each of its units, and the system operator's turn-up and curtailment.
+  Pick the station from the list or the map.
+- **Output:** national generation by fuel, then a heatmap per fuel type with a
+  row per station, north at the top.
+- **Annual:** a calendar of daily energy per metric for any selection of fuels
+  and stations, in MWh or as a share of capacity.
+- **Constraints:** NESO day-ahead flows against limits for each boundary.
+
+Every filter and time window lives in the URL, so any view can be shared as a
+link. Drag across a time chart to zoom in.
+
+The browser reads from [PostgREST](https://postgrest.org), which serves the
+database's `api` schema: a set of read-only SQL functions, one per view's query,
+defined in `src/gb_grid/migrations/post-apply.api.sql`. Each is a GET on
+`/api/rpc/<function>`, for example:
+
+```bash
+curl 'http://localhost:8080/api/rpc/dispatch_series?station=SGRWO&start_ts=2026-05-13T00:00Z&end_ts=2026-05-14T00:00Z&step=30%20minutes'
+```
+
+To work on it, start the stack (`nix develop`, or `docker compose up -d db
+postgrest`), then:
+
+```bash
+cd web
+npm install
+npm run dev        # http://localhost:5173; /api is proxied to PostgREST on :3001
+npm run check      # type-check
+npm test           # unit tests
+```
+
+A new view is usually a new function in `post-apply.api.sql` plus a page in
+`web/src/routes/`. `ingester/tests/test_api_schema.rs` calls each function as
+PostgREST's role and compares it with the original Grafana query.
+
 ## Dashboards
 
-`docker compose` runs Grafana on <http://localhost:3000> (anonymous Editor
-access; admin/admin if you want to log in), provisioned from
-`docker/grafana/provisioning/` (datasource uid `gbgrid`, pointed at the `db`
-service) plus the dashboards in `grafana/dashboards/`.
+The web UI has four views. The screenshots below are from the local dataset
+for May 2026, and each one follows the system light or dark setting.
 
-### BMU dispatch
+### Dispatch
 
-Pick a station (or click one on the map) to see its aggregate planned vs.
-instructed vs. actual output, a stacked per-BMU breakdown, and the turn-up /
-curtailment the system operator instructed.
+Pick a station (or click one on the map) to see its planned (PN), dispatched,
+MEL and metered (B1610) output, the output of each of its units, and the system
+operator's turn-up and curtailment. The energy table totals the window in MWh,
+counting whole UTC days.
 
-![BMU dispatch dashboard](docs/images/bmu_dispatch.png)
-
-The bottom panel separates instructed **turn-up** (green, generate more) from
-**curtailment** (red, generate less) per BMU:
-
-![BMU dispatch — turn-up and curtailment](docs/images/bmu_dispatch_curtailment.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/dispatch-dark.png">
+  <img alt="Dispatch view for SGRWO: station output, output by unit and system operator actions" src="docs/images/web/dispatch-light.png">
+</picture>
 
 > [!NOTE]
-> The PN / Dispatched / B1610 series on the station-total panel still need
+> The PN / Dispatched / B1610 series on the station-total chart still need
 > work: the three are sourced from different streams (interpolated PN+BOALF
 > vs. half-hourly settlement actuals) and don't always reconcile cleanly,
 > especially around BOA acceptances and during B1610's ~5-working-day lag.
 > Treat them as a sanity check on each other, not as the same number.
 
-### BMU output heatmap
+### Output
 
-National generation by fuel type, with per-station load-factor heatmaps (output
-as a % of each station's MEL capacity) grouped by fuel — a quick read on which
-plants are running hard and which are idle.
+National generation by fuel, then a heatmap for each fuel type with one row per
+station, coloured by load factor (output as a share of the station's MEL
+capacity). It's a quick read on which plants are running hard and which are
+idle. Each section loads when you scroll to it. Clicking a station opens its
+Dispatch view for the same window.
 
-![BMU output heatmap dashboard](docs/images/bmu_heatmap.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/output-dark.png">
+  <img alt="Output view: national generation by fuel and a wind load-factor heatmap by station" src="docs/images/web/output-light.png">
+</picture>
 
-### BMU annual summary
+### Annual
 
-A year of daily output per station as a calendar heatmap, either in absolute
-MWh/day or — pictured — as a % of MEL capacity, alongside a map for selecting
-stations and fuel types.
+A calendar of daily energy for each metric (planned, dispatched, metered, SO
+turn-up and BOA curtailment) across the chosen window. Pick the fuel types and
+stations on the map or in the lists, then switch between MWh per day and the
+share of capacity.
 
-![BMU annual summary (% of MEL capacity) dashboard](docs/images/bmu_annual_summary_pct.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/annual-dark.png">
+  <img alt="Annual view: daily energy calendars for wind as a percentage of capacity" src="docs/images/web/annual-light.png">
+</picture>
 
-Backfill, then materialize, then open Grafana:
+### Constraints
+
+NESO's day-ahead flow forecast for each transmission boundary, against its
+limit. The shaded band is each day's minimum-to-maximum range, the blue line
+is the 24-hour average, and the red line is the limit.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/constraints-dark.png">
+  <img alt="Constraints view: small multiples of boundary flows against limits" src="docs/images/web/constraints-light.png">
+</picture>
+
+The original Grafana dashboards are still provisioned on
+<http://localhost:3000> so you can compare the two. They'll be removed once the
+web UI is signed off.
+
+Backfill, then materialize, then open the web UI:
 
 ```bash
 gb-grid-ingest backfill --from 2026-04-01 --to 2026-04-07
 gb-grid-ingest materialize-dispatch --from 2026-04-01 --to 2026-04-07
-xdg-open http://localhost:3000/d/bmu-dispatch
+xdg-open http://localhost:8080/dispatch
 ```
 
 ## Migrations
@@ -225,6 +291,10 @@ In production the NixOS module runs `ALTER EXTENSION timescaledb UPDATE`, then
 `gb-grid migrate`, before the ingester starts. Never edit a migration that has
 been merged. To correct one, add a new migration that supersedes it (as 0016
 does for 0015).
+
+`post-apply.api.sql` is the exception: it's a yoyo post-apply hook, not a
+migration. `gb-grid migrate` re-runs it on every invocation, and it rebuilds the
+web UI's `api` schema from scratch, so edit it in place.
 
 ## Configuration
 
@@ -248,6 +318,12 @@ does for 0015).
   required for `gb-grid migrate`.
 - **Start-up:** the service runs `ALTER EXTENSION timescaledb UPDATE`, then
   `gb-grid migrate`, then the ingester.
+- **Web UI:** pass `packages.gb-grid-web` as `specialArgs.gb-grid-web-pkg` and
+  the module serves it with nginx on `services.gb-grid.web.port` (default
+  8080, opened in the firewall unless `web.openFirewall = false`). nginx proxies
+  `/api` to PostgREST on a Unix socket. PostgREST logs in as the `postgrest`
+  database role and runs requests as the read-only `web_anon` role, which
+  `gb-grid migrate` creates (the module gives `gb_grid` CREATEROLE for that).
 - **TimescaleDB version:** the module builds TimescaleDB ≥ 2.32.1, because
   nixos-26.05's 2.27.1 makes every TimescaleDB background job fail on
   PostgreSQL ≥ 16.16. The override drops itself once nixpkgs catches up.

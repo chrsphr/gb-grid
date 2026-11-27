@@ -28,7 +28,7 @@ NESO CSV ────────┤ ingest (scheduler ticks / backfill CLI)
                                           bmu_dispatch_daily (table, MWh — heatmap)
                  │
                  ▼  serving functions
-        dispatch_series()  b1610_series()   → Grafana (resolution chosen by $__interval)
+        dispatch_series()  b1610_series()   → web UI via the api schema (resolution chosen by chart width)
 ```
 
 ## 1. Ingest layer (raw hypertables)
@@ -177,8 +177,9 @@ source for the annual heatmap.
 
 ## 5. Serving functions (resolution matched to zoom)
 
-Grafana passes the pixel-derived bucket width via `$__interval`; these routers
-pick the coarsest tier whose native bucket ≤ the requested bucket, so every zoom
+The web UI derives the bucket width from the chart's pixel width
+(`web/src/lib/interval.ts`, the same idea as Grafana's `$__interval`); these
+routers pick the coarsest tier whose native bucket ≤ the requested bucket, so every zoom
 returns ~1–2k points in low-ms.
 
 - **`dispatch_series(station, from, to, bucket)`** (0010) — per-BMU avg MW per
@@ -188,13 +189,20 @@ returns ~1–2k points in low-ms.
   bucket. `bucket ≥ 1 day` → `b1610_daily_cagg` (energy/24h); else raw half-hourly
   `b1610` with a `settlement_date` filter for chunk exclusion.
 
-## 6. Dashboards (what reads what)
+## 6. Views (what reads what)
 
-| Dashboard | Panels | Source |
+The web UI (`web/`) has four views. Each reads the `api` schema through PostgREST,
+and every function is defined in `src/gb_grid/migrations/post-apply.api.sql`.
+
+| View | Functions | Reads from |
 |---|---|---|
-| `bmu_dispatch` | PN/Dispatched/MEL + B1610; per-BMU; curtailment | `dispatch_series()` + `b1610_series()` |
-| `bmu_annual_summary` | weekly/daily heatmaps | `bmu_dispatch_daily` |
-| `constraints` | flow / limit / bands | `constraints` table |
+| Dispatch | `stations()`, `dispatch_series()`, `b1610_series()`, `dispatch_totals()` | `bmu`, the dispatch routers (§5), `bmu_dispatch_daily` |
+| Output | `fuel_mix()`, `station_grid()` | `fuelinst`, `mels`, `b1610_hh_cagg` |
+| Annual | `fuel_types()`, `stations()`, `daily_calendar()` | `mels`, `bmu_dispatch_daily`, `bmu` |
+| Constraints | `constraint_groups()`, `constraint_series()` | `constraints` |
+
+The Grafana dashboards in `grafana/dashboards/` still read the same tables
+directly. They'll be removed once the web UI is signed off.
 
 ## 7. Compression & retention
 
