@@ -16,14 +16,21 @@ order of preference:
      technology (BATTERY, SOLAR, ...).
 
 Location, in order of preference (the first that applies wins):
-  1. Existing coordinates. These are never overwritten.
+  1. The original 0004 coordinates. These are never touched.
   2. Wikidata: an item with P11610 (National Grid BM unit ID) = this unit,
      taking its P625 coordinates or its parent station's.
   3. REPD, via the REPD ID from Wikidata (P9891) or from the existing table.
-  4. A match of the unit's station name, technology and capacity against REPD
-     (operational, under construction or awaiting construction) or DUKES 5.11.
-     Single-site units only (T_ / E_ / M_). Supplier (2__), virtual (V__) and
-     interconnector (I_) units have no single location and are left NULL.
+  4. Station-demand units (CLACD-1, GORDD-1) take their generator's location
+     (CLAC-1, GORDW-1).
+  5. An exact match of the station name, plus technology and capacity
+     checks, against REPD (operational, under construction or awaiting
+     construction) or DUKES 5.11 thermal/nuclear. DUKES wind and hydro
+     coordinates fail validation and are not used. Single-site units only
+     (T_ / E_ / M_). Supplier (2__), virtual (V__) and interconnector (I_)
+     units have no single location and are left NULL.
+Locations a previous refresh assigned are recomputed every time, so running a
+newer refresh corrects them. `--validate` name-matches every unit whose
+location is already known and reports the error by source and technology.
 Every coordinate must fall inside a GB-and-waters bounding box.
 
 Usage (needs network; openpyxl for the DUKES xlsx):
@@ -285,12 +292,25 @@ _GENERIC_WORDS = """
     """
 GENERIC = frozenset(_GENERIC_WORDS.split())
 
+# DUKES categories whose coordinates hold up (`--validate`: fossil 20/20, nuclear
+# 2/2 within 5 km). DUKES wind (46%: offshore farms sit at their onshore
+# connection) and hydro (50%, e.g. Clachan placed on Skye) are never used.
+DUKES_RELIABLE = frozenset(
+    {
+        "Fossil Fuel CCGT",
+        "Fossil Fuel Single cycle",
+        "Fossil Fuel Conventional steam",
+        "Nuclear",
+        "Bioenergy",
+    }
+)
+
 TECH = {  # tag -> (REPD technologies, DUKES technologies)
-    "wind": ({"Wind Onshore", "Wind Offshore"}, {"Wind"}),
+    "wind": ({"Wind Onshore", "Wind Offshore"}, set()),
     "battery": ({"Battery"}, set()),
-    "solar": ({"Solar Photovoltaics"}, {"Solar"}),
-    "hydro": ({"Small Hydro", "Large Hydro"}, {"Hydro"}),
-    "ps": ({"Pumped Storage Hydroelectricity"}, {"Pumped Hydro"}),
+    "solar": ({"Solar Photovoltaics"}, set()),
+    "hydro": ({"Small Hydro", "Large Hydro"}, set()),
+    "ps": ({"Pumped Storage Hydroelectricity"}, set()),
     "biomass": (
         {
             "Biomass (dedicated)",
@@ -364,8 +384,12 @@ def tech_tag(unit: dict, wd: dict | None) -> str | None:
 
 
 def norm(name: str) -> str:
-    s = re.sub(r"[^a-z0-9 ]+", " ", name.lower().replace("&", " and "))
-    toks = [t for t in s.split() if t not in GENERIC and not re.fullmatch(r"\d+[a-z]?", t)]
+    # Numbers stay: they tell phases apart (Craig 2 vs Craig, Hornsea 1 vs 3).
+    # Unit numbers were already stripped by station_name. "01" -> "1".
+    # Apostrophes join rather than split ("Fiddler's" == "Fiddlers").
+    s = re.sub(r"[\u2019']", "", name.lower().replace("&", " and "))
+    s = re.sub(r"[^a-z0-9 ]+", " ", s)
+    toks = [t.lstrip("0") or "0" if t.isdigit() else t for t in s.split() if t not in GENERIC]
     return " ".join(toks)
 
 
@@ -397,19 +421,24 @@ def best_site(
     for s in sites:
         if s["status"] not in ("Operational", "Under Construction", "Awaiting Construction"):
             continue
-        allowed = repd_t if s["src"].startswith("repd") else dukes_t
+        is_repd = s["src"].startswith("repd")
+        if not is_repd and s["tech"] not in DUKES_RELIABLE:
+            continue
+        allowed = repd_t if is_repd else dukes_t
         if allowed is not None and s["tech"] not in allowed:
             continue
         cand = s.setdefault("_norm", norm(s["name"]))
         if not cand:
             continue
-        score = difflib.SequenceMatcher(None, target, cand).ratio()
+        # Names must match token for token (or near-verbatim). `--validate` showed
+        # fuzzy matches put units 40-420 km away: Ilmer Lane -> Illey Lane,
+        # Coylton -> Neilston Greener Grid Park, ABRBO -> Burbo.
         if set(target.split()) == set(cand.split()):
-            score = max(score, 0.97)
-        # Without a known technology there is no type check, so the name has to
-        # carry the match on its own (rejects e.g. Bispham -> Bilsham, Rake -> Rag Lane).
-        if score < (0.8 if tag else 0.92):
-            continue
+            score = 1.0
+        else:
+            score = difflib.SequenceMatcher(None, target, cand).ratio()
+            if score < 0.97:
+                continue
         if cap and s["cap"] and not (1 / 3 <= s["cap"] / cap <= 3):
             continue  # same name, wrong size: probably a different site
         bonus = 0.02 * (s["status"] == "Operational") + (
@@ -437,9 +466,16 @@ def best_site(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", type=Path, required=True, help="download cache dir")
-    ap.add_argument("--out", type=Path, required=True, help="SQL migration to write")
+    ap.add_argument("--out", type=Path, help="SQL migration to write")
     ap.add_argument("--review", type=Path, help="review CSV (default: next to --cache)")
+    ap.add_argument(
+        "--validate",
+        action="store_true",
+        help="only report name-match accuracy against known locations",
+    )
     args = ap.parse_args()
+    if not args.validate and not args.out:
+        ap.error("--out is required unless --validate")
     args.cache.mkdir(parents=True, exist_ok=True)
     review_path = args.review or args.cache / "bmu_review.csv"
 
@@ -469,101 +505,217 @@ def main() -> None:
     for i in ids:
         stations[STATION_RE.sub("", i)].append(elexon.get(i, {"nationalGridBmUnit": i}))
 
-    out, review, stats = [], [], defaultdict(int)
+    if args.validate:
+        validate(elexon, base, wd, stations, sites)
+        return
+
+    stats: dict[str, int] = defaultdict(int)
+    recs = {i: locate_known(i, elexon, base, wd, repd_by_id, stats) for i in ids}
+    review: list[dict] = []
+    # Name matching runs for generators first. A station-demand unit (CLACD-1,
+    # GORDD-1, ...) takes its generator's location (CLAC-1, GORDW-1) when it
+    # has one, and is only name-matched itself as a last resort.
+    order = sorted(ids, key=lambda i: is_demand(recs[i]))
+    for i in order:
+        r = recs[i]
+        if r["lat"] is not None or not r["single_site"]:
+            continue
+        if is_demand(r) and inherit_from_generator(r, recs):
+            continue
+        name_match(r, stations, sites, review)
+
+    out = []
     for i in ids:
-        u, b, w = elexon.get(i, {}), base.get(i, {}), wd.get(i.upper())
-        bm_unit = u.get("elexonBmUnit") or b.get("SETT UNIT ID") or None
-        lat = _num(b.get("latitude"))
-        lon = _num(b.get("longitude"))
-        loc_src = "csv:0004" if lat is not None else None
-        repd_id = (b.get("UK_REPD_ID") or "").removesuffix(".0") or None
-        tag = tech_tag(u, w)
-        site = None
-
-        if lat is None and w and w["coords"]:
-            pts = sorted(w["coords"])
-            if len(pts) == 1 or max(km(pts[0], p) for p in pts) < 2:
-                cand = pts[0]
-                if in_bbox(*cand):
-                    lat, lon, loc_src = *cand, "wikidata:" + ",".join(sorted(w["items"]))
-                else:
-                    stats["wikidata rejected (outside GB bbox)"] += 1
-        if w and w["repd"] and not repd_id:
-            repd_id = sorted(w["repd"])[0]
-        if lat is None and repd_id and repd_id in repd_by_id:
-            site = repd_by_id[repd_id]
-            lat, lon, loc_src = site["lat"], site["lon"], f"repd:{repd_id}"
-        single_site = (bm_unit or "")[:2] in ("T_", "E_", "M_")
-        if lat is None and single_site:
-            stn = STATION_RE.sub("", i)
-            sname = station_name(stations[stn])
-            cap = sum(_num(x.get("generationCapacity")) or 0 for x in stations[stn]) or None
-            if sname:
-                site, score, why = best_site(sname, tag, cap, sites)
-                if site and in_bbox(site["lat"], site["lon"]):
-                    lat, lon, loc_src = site["lat"], site["lon"], site["src"]
-                    if site["id"]:
-                        repd_id = repd_id or site["id"]
-                review.append(
-                    {
-                        "ngc_bm_unit": i,
-                        "station_name": sname,
-                        "tech": tag,
-                        "station_cap_mw": cap,
-                        "result": why if not site else "matched",
-                        "score": round(score, 3),
-                        "site": site["name"] if site else "",
-                        "site_tech": site["tech"] if site else "",
-                        "site_cap_mw": site["cap"] if site else "",
-                        "source": site["src"] if site else "",
-                        "lat": lat,
-                        "lon": lon,
-                    }
-                )
-        if loc_src:
-            stats["location from " + loc_src.split(":")[0]] += 1
-        elif single_site:
+        r = recs[i]
+        if r["loc_src"]:
+            stats["location from " + r["loc_src"].split(":")[0]] += 1
+        elif r["single_site"]:
             stats["single-site unit left unlocated"] += 1
-
-        # Fuel type: Elexon > existing > inferred from technology.
-        fuel, fuel_src = u.get("fuelType"), "elexon"
-        if not fuel:
-            fuel, fuel_src = (b.get("BMRS FUEL TYPE") or None), "csv:0004"
-        reg = b.get("REG FUEL TYPE") or None
-        site_tag = tag
-        if site and not site_tag:
-            for t, (rt, dt) in TECH.items():
-                if site["tech"] in rt | dt:
-                    site_tag = t
-        if site_tag in TAG_FUEL and not reg:
-            reg = TAG_FUEL[site_tag][1]
-        if not fuel and site_tag in TAG_FUEL:
-            fuel, fuel_src = TAG_FUEL[site_tag][0], "inferred:" + site_tag
-        if not fuel:
-            fuel_src = None
-        if (
-            b
-            and u.get("fuelType")
-            and b.get("BMRS FUEL TYPE")
-            and u["fuelType"] != b["BMRS FUEL TYPE"]
-        ):
-            stats["fuel type changed by Elexon"] += 1
-
+        fuel, reg, fuel_src = fuel_type(r, stats)
         out.append(
-            (i, bm_unit, fuel, reg, lat, lon, repd_id, u.get("bmUnitName"), loc_src, fuel_src)
+            (
+                i,
+                r["bm_unit"],
+                fuel,
+                reg,
+                r["lat"],
+                r["lon"],
+                r["repd_id"],
+                r["u"].get("bmUnitName"),
+                r["loc_src"],
+                fuel_src,
+            )
         )
         stats["units"] += 1
-        stats["new units (not in 0004)"] += not b
+        stats["new units (not in 0004)"] += not r["b"]
 
     with review_path.open("w", newline="") as f:
-        wr = csv.DictWriter(f, fieldnames=list(review[0])) if review else None
-        if wr:
+        if review:
+            wr = csv.DictWriter(f, fieldnames=list(review[0]))
             wr.writeheader()
             wr.writerows(review)
     write_sql(args.out, out)
     for k, n in sorted(stats.items()):
         print(f"  {k:42} {n}", file=sys.stderr)
     print(f"wrote {args.out} and {review_path}", file=sys.stderr)
+
+
+def locate_known(i, elexon, base, wd, repd_by_id, stats) -> dict:
+    """Steps 1-3: existing coordinates, Wikidata by BM unit ID, REPD by ID."""
+    u, b, w = elexon.get(i, {}), base.get(i, {}), wd.get(i.upper())
+    r = {
+        "id": i,
+        "u": u,
+        "b": b,
+        "w": w,
+        "site": None,
+        "bm_unit": u.get("elexonBmUnit") or b.get("SETT UNIT ID") or None,
+        "lat": _num(b.get("latitude")),
+        "lon": _num(b.get("longitude")),
+        "repd_id": (b.get("UK_REPD_ID") or "").removesuffix(".0") or None,
+        "tag": tech_tag(u, w),
+    }
+    r["loc_src"] = "csv:0004" if r["lat"] is not None else None
+    r["single_site"] = (r["bm_unit"] or "")[:2] in ("T_", "E_", "M_")
+    if r["lat"] is None and w and w["coords"]:
+        pts = sorted(w["coords"])
+        if len(pts) == 1 or max(km(pts[0], p) for p in pts) < 2:
+            if in_bbox(*pts[0]):
+                r["lat"], r["lon"] = pts[0]
+                r["loc_src"] = "wikidata:" + ",".join(sorted(w["items"]))
+            else:
+                stats["wikidata rejected (outside GB bbox)"] += 1
+    if w and w["repd"] and not r["repd_id"]:
+        r["repd_id"] = sorted(w["repd"])[0]
+    if r["lat"] is None and r["repd_id"] in repd_by_id:
+        site = r["site"] = repd_by_id[r["repd_id"]]
+        r["lat"], r["lon"], r["loc_src"] = site["lat"], site["lon"], f"repd:{r['repd_id']}"
+    return r
+
+
+def is_demand(r: dict) -> bool:
+    stn = STATION_RE.sub("", r["id"])
+    name = (r["u"].get("bmUnitName") or "").lower()
+    return stn.endswith("D") and (
+        "demand" in name
+        or r["b"].get("DGB FLG") == "Demand"
+        or r["u"].get("productionOrConsumptionFlag") == "C"
+    )
+
+
+def inherit_from_generator(r: dict, recs: dict) -> bool:
+    """Give a station-demand unit its generator's location: CLACD -> CLAC,
+    GORDD -> GORDW, GRIFWD -> GRIFW (same stem, minus or swapping the D)."""
+    stn = STATION_RE.sub("", r["id"])
+    stem = stn[:-1]
+    best = None
+    for k, g in recs.items():
+        gs = STATION_RE.sub("", k)
+        if k == r["id"] or g["lat"] is None or is_demand(g):
+            continue
+        if gs == stem or (len(gs) == len(stn) and gs[:-1] == stem):
+            # Prefer the most trustworthy source: csv > wikidata > repd > a name match.
+            rank = ("csv", "wikidata", "repd", "dukes").index(g["loc_src"].split(":")[0])
+            if best is None or rank < best[0]:
+                best = (rank, k, g)
+    if not best:
+        return False
+    _, k, g = best
+    r["lat"], r["lon"], r["loc_src"] = g["lat"], g["lon"], f"generator:{k}"
+    r["tag"] = r["tag"] or g["tag"]
+    return True
+
+
+def name_match(r: dict, stations: dict, sites: list[dict], review: list[dict]) -> None:
+    """Step 4: station name + technology + capacity against REPD / DUKES."""
+    stn = STATION_RE.sub("", r["id"])
+    sname = station_name(stations[stn])
+    if not sname:
+        return
+    cap = sum(_num(x.get("generationCapacity")) or 0 for x in stations[stn]) or None
+    site, score, why = best_site(sname, r["tag"], cap, sites)
+    if site and in_bbox(site["lat"], site["lon"]):
+        r["site"] = site
+        r["lat"], r["lon"], r["loc_src"] = site["lat"], site["lon"], site["src"]
+        r["repd_id"] = r["repd_id"] or site["id"]
+    review.append(
+        {
+            "ngc_bm_unit": r["id"],
+            "station_name": sname,
+            "tech": r["tag"],
+            "station_cap_mw": cap,
+            "result": "matched" if r["site"] is site and site else why,
+            "score": round(score, 3),
+            "site": site["name"] if site else "",
+            "site_tech": site["tech"] if site else "",
+            "site_cap_mw": site["cap"] if site else "",
+            "source": site["src"] if site else "",
+            "lat": r["lat"],
+            "lon": r["lon"],
+        }
+    )
+
+
+def fuel_type(r: dict, stats: dict) -> tuple[str | None, str | None, str | None]:
+    """bmrs_fuel_type: Elexon > existing > inferred from the matched technology."""
+    u, b, site = r["u"], r["b"], r["site"]
+    fuel, fuel_src = u.get("fuelType"), "elexon"
+    if not fuel:
+        fuel, fuel_src = (b.get("BMRS FUEL TYPE") or None), "csv:0004"
+    reg = b.get("REG FUEL TYPE") or None
+    tag = r["tag"]
+    if site and not tag:
+        tag = next((t for t, (rt, dt) in TECH.items() if site["tech"] in rt | dt), None)
+    if tag in TAG_FUEL and not reg:
+        reg = TAG_FUEL[tag][1]
+    if not fuel and tag in TAG_FUEL:
+        fuel, fuel_src = TAG_FUEL[tag][0], "inferred:" + tag
+    if not fuel:
+        fuel_src = None
+    if b and u.get("fuelType") and b.get("BMRS FUEL TYPE") and u["fuelType"] != b["BMRS FUEL TYPE"]:
+        stats["fuel type changed by Elexon"] += 1
+    return fuel, reg, fuel_src
+
+
+def validate(elexon, base, wd, stations, sites) -> None:
+    """Name-match every station whose location is already known (existing or
+    Wikidata) and report how far the matched site is from the truth."""
+    truth = {}
+    for i in set(elexon) | set(base):
+        b, w = base.get(i, {}), wd.get(i.upper())
+        if b.get("latitude"):
+            truth[i] = (float(b["latitude"]), float(b["longitude"]))
+        elif w and len(w["coords"]) == 1 and in_bbox(*next(iter(w["coords"]))):
+            truth[i] = next(iter(w["coords"]))
+    res, bad, done = defaultdict(list), [], set()
+    for i, t in truth.items():
+        stn = STATION_RE.sub("", i)
+        if stn in done or (elexon.get(i, {}).get("elexonBmUnit") or "")[:2] not in (
+            "T_",
+            "E_",
+            "M_",
+        ):
+            continue
+        done.add(stn)
+        sname = station_name(stations[stn])
+        if not sname:
+            continue
+        cap = sum(_num(x.get("generationCapacity")) or 0 for x in stations[stn]) or None
+        site, _, _ = best_site(sname, tech_tag(elexon.get(i, {}), wd.get(i.upper())), cap, sites)
+        if site:
+            d = km(t, (site["lat"], site["lon"]))
+            res[(site["src"].split(":")[0], site["tech"].split(" ")[0])].append(d)
+            if d > 5:
+                bad.append((d, i, sname, site["name"], site["src"]))
+    print(f"{'source':6} {'tech':12} {'n':>4} {'<=2km':>6} {'<=5km':>6}")
+    for (src, tech), ds in sorted(res.items(), key=lambda kv: (kv[0][0], -len(kv[1]))):
+        n, near, ok = len(ds), sum(d <= 2 for d in ds), sum(d <= 5 for d in ds)
+        print(f"{src:6} {tech:12} {n:4} {near / n:6.0%} {ok / n:6.0%}")
+    tot = [d for ds in res.values() for d in ds]
+    if tot:
+        print(f"overall {len(tot)} matches, {sum(d <= 5 for d in tot) / len(tot):.0%} within 5 km")
+    for d, i, sname, site, src in sorted(bad, reverse=True):
+        print(f"  >5 km: {i:10} {sname[:28]:28} -> {site[:30]:30} {src:22} {d:6.1f} km")
 
 
 def q(v) -> str:
@@ -577,10 +729,12 @@ def q(v) -> str:
 def write_sql(path: Path, rows: list[tuple]) -> None:
     head = f"""-- BMU reference refresh, generated by tools/bmu/refresh_bmu.py. Do not edit by hand.
 -- Units and names: Elexon. Fuel type: Elexon > existing > inferred from the
--- matched site's technology. Locations: existing (never overwritten) >
--- Wikidata P11610 > REPD by ID > name/technology/capacity match to REPD or
--- DUKES 5.11. `location_source` and `fuel_type_source` record which one
--- applied. {len(rows)} units.
+-- matched site's technology. Location: original 0004 coordinates (never
+-- touched) > Wikidata P11610 > REPD by ID > the unit's generator (station
+-- demand units) > exact name + technology + capacity match to REPD or DUKES
+-- 5.11 thermal/nuclear. Anything a previous refresh assigned is recomputed, so
+-- re-running a newer refresh corrects it. `location_source` / `fuel_type_source`
+-- record which rule applied. {len(rows)} units.
 
 ALTER TABLE bmu ADD COLUMN IF NOT EXISTS bmu_name TEXT;
 ALTER TABLE bmu ADD COLUMN IF NOT EXISTS location_source TEXT;
@@ -594,15 +748,17 @@ INSERT INTO bmu (ngc_bm_unit, bm_unit, bmrs_fuel_type, reg_fuel_type, latitude, 
     tail = """
 ON CONFLICT (ngc_bm_unit) DO UPDATE SET
   bm_unit          = COALESCE(EXCLUDED.bm_unit, bmu.bm_unit),
-  bmrs_fuel_type   = COALESCE(EXCLUDED.bmrs_fuel_type, bmu.bmrs_fuel_type),
-  reg_fuel_type    = COALESCE(bmu.reg_fuel_type, EXCLUDED.reg_fuel_type),
-  latitude         = COALESCE(bmu.latitude, EXCLUDED.latitude),
-  longitude        = COALESCE(bmu.longitude, EXCLUDED.longitude),
-  repd_id          = COALESCE(bmu.repd_id, EXCLUDED.repd_id),
+  bmrs_fuel_type   = EXCLUDED.bmrs_fuel_type,
+  reg_fuel_type    = EXCLUDED.reg_fuel_type,
+  latitude         = CASE WHEN bmu.location_source = 'csv:0004' THEN bmu.latitude
+                          ELSE EXCLUDED.latitude END,
+  longitude        = CASE WHEN bmu.location_source = 'csv:0004' THEN bmu.longitude
+                          ELSE EXCLUDED.longitude END,
+  location_source  = CASE WHEN bmu.location_source = 'csv:0004' THEN bmu.location_source
+                          ELSE EXCLUDED.location_source END,
+  repd_id          = EXCLUDED.repd_id,
   bmu_name         = COALESCE(EXCLUDED.bmu_name, bmu.bmu_name),
-  location_source  = CASE WHEN bmu.latitude IS NULL THEN EXCLUDED.location_source
-                         ELSE bmu.location_source END,
-  fuel_type_source = COALESCE(EXCLUDED.fuel_type_source, bmu.fuel_type_source);
+  fuel_type_source = EXCLUDED.fuel_type_source;
 """
     path.write_text(head + body + tail)
 

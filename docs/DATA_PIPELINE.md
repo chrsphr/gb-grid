@@ -97,19 +97,28 @@ hourly tick does no redundant work.
 
 **BMU reference data.** `bmu` was loaded once (0004) from a vendored 2022-era CSV.
 `tools/bmu/refresh_bmu.py` rebuilds it from live sources and emits an upsert
-migration (first run: `0015.bmu_refresh.sql`). To refresh, re-run the tool into
-the next migration number and review `bmu_review.csv`.
+migration (`0015.bmu_refresh.sql`, superseded by `0016.bmu_refresh_fix.sql`).
+To refresh, re-run the tool into the next migration number and review
+`bmu_review.csv`.
 
 - **Units and names:** the Elexon reference list.
 - **Fuel type:** Elexon > existing > inferred from the matched site's
   technology. Batteries and solar become `OTHER`, as BMRS classes them;
   `reg_fuel_type` keeps `BATTERY` / `SOLAR`.
 - **Location**, first match wins:
-  1. Existing coordinates (never overwritten).
+  1. Original 0004 coordinates (never touched).
   2. Wikidata items with P11610 (National Grid BM unit ID).
   3. REPD, via its ID.
-  4. A name + technology + capacity match against REPD or DUKES 5.11
-     (single-site `T_`/`E_`/`M_` units only).
+  4. For station-demand units (e.g. `CLACD-1`), their generator's location
+     (`CLAC-1`).
+  5. An exact name + technology + capacity match against REPD or DUKES 5.11
+     (single-site `T_`/`E_`/`M_` units only). Only DUKES's thermal and
+     nuclear sites are used: its wind and hydro coordinates fail validation
+     (Clachan, for example, is placed on Skye).
+- `--validate` name-matches every unit whose location is already known and
+  reports the error by source. The first refresh: 95% within 5 km.
+- Locations a previous refresh assigned are recomputed each run, so a newer
+  refresh corrects them.
 - Supplier (`2__`), virtual (`V__`) and interconnector (`I_`) units have no
   single site and stay unlocated.
 - Every point must fall inside a GB bounding box, which caught a Wikidata
