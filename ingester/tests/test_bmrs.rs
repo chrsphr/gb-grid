@@ -530,6 +530,39 @@ async fn fetch_system_prices_uses_requested_day() {
     );
 }
 
+/// Regression: the API sends 17+ significant digits (real values from
+/// 2026-01-14). serde_json's default fast float parser is not correctly rounded
+/// and landed 1 ULP away from Python's `json` (e.g. 122.79999999999999 →
+/// 122.8 instead of 122.79999999999998). The `float_roundtrip` feature fixes
+/// it. The body is sent raw so nothing re-serialises the literals first.
+#[tokio::test]
+async fn fetch_system_prices_parses_long_floats_correctly_rounded() {
+    let server = MockServer::start().await;
+    let body = r#"[{"settlementPeriod":15,"systemSellPrice":122.79999999999999,
+        "systemBuyPrice":101.04999999999999,"netImbalanceVolume":29.478367234848484202}]"#;
+    Mock::given(method("GET"))
+        .and(path("/balancing/settlement/system-prices/2026-01-14"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+        .mount(&server)
+        .await;
+
+    let client = BmrsClient::new(&cfg(server.uri()));
+    let day = NaiveDate::from_ymd_opt(2026, 1, 14).unwrap();
+    let (_, rows) = fetch_system_prices(&client, day).await.unwrap();
+
+    // std's str::parse::<f64> is correctly rounded, matching Python's float().
+    let exact = |s: &str| Value::Float(s.parse::<f64>().unwrap());
+    assert_ne!("122.79999999999999".parse::<f64>().unwrap(), 122.8);
+    assert_eq!(
+        rows[0][2..],
+        [
+            exact("122.79999999999999"),
+            exact("101.04999999999999"),
+            exact("29.478367234848484202"),
+        ]
+    );
+}
+
 #[tokio::test]
 async fn fetch_system_prices_skips_rows_without_period() {
     let server = MockServer::start().await;
