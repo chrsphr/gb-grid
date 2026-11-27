@@ -6,8 +6,7 @@ Britain's electricity grid, sourced from
 official near-real-time data feed for the GB electricity balancing and
 settlement system. It downloads generation, balancing-action, and
 plant-capacity data, stores it in a [TimescaleDB](https://www.timescale.com/)
-(PostgreSQL) database, and ships a set of [Grafana](https://grafana.com/)
-dashboards on top for exploration.
+(PostgreSQL) database, and ships a web UI on top for exploration.
 
 It's aimed at anyone who wants to poke at how the GB grid actually behaves —
 energy hobbyists, researchers, students, or developers prototyping against real
@@ -18,11 +17,14 @@ balancing-mechanism data. With it you can explore questions like:
 - How is the system operator **dispatching** individual units minute to minute?
 - How does the national fuel mix (wind / gas / nuclear / interconnectors / …) shift across a day?
 
-The whole stack runs from a single `docker compose up` — Postgres, Grafana, and
-a background ingester that keeps the data current. If you use [Nix](https://nixos.org/),
+The whole stack runs from a single `docker compose up` — Postgres, the web UI,
+and a background ingester that keeps the data current. If you use [Nix](https://nixos.org/),
 there's a dev shell layered on the same services.
 
-![BMU dispatch dashboard](docs/images/bmu_dispatch.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/dispatch-dark.png">
+  <img alt="gb-grid web UI, dispatch view" src="docs/images/web/dispatch-light.png">
+</picture>
 
 > [!CAUTION]
 > This repo is almost entirely vibe-coded. Do not expect quality, but also, let me assure you it would be even worse if I attempted to write this myself.
@@ -30,8 +32,8 @@ there's a dev shell layered on the same services.
 ## Quick start
 
 The whole stack runs through `docker compose`: Postgres (TimescaleDB), the
-ingester, the web UI with its read API (PostgREST), and Grafana (provisioned
-with the original dashboards, while the web UI replaces them).
+ingester, the web UI with its read API (PostgREST), and the original Grafana
+dashboards, kept until the web UI is signed off.
 
 ```bash
 docker compose up -d --build          # or: just docker-up
@@ -210,53 +212,74 @@ PostgREST's role and compares it with the original Grafana query.
 
 ## Dashboards
 
-`docker compose` runs Grafana on <http://localhost:3000> (anonymous Editor
-access; admin/admin if you want to log in), provisioned from
-`docker/grafana/provisioning/` (datasource uid `gbgrid`, pointed at the `db`
-service) plus the dashboards in `grafana/dashboards/`.
+The web UI has four views. The screenshots below are from the local dataset
+for May 2026, and each one follows the system light or dark setting.
 
-### BMU dispatch
+### Dispatch
 
-Pick a station (or click one on the map) to see its aggregate planned vs.
-instructed vs. actual output, a stacked per-BMU breakdown, and the turn-up /
-curtailment the system operator instructed.
+Pick a station (or click one on the map) to see its planned (PN), dispatched,
+MEL and metered (B1610) output, the output of each of its units, and the system
+operator's turn-up and curtailment. The energy table totals the window in MWh,
+counting whole UTC days.
 
-![BMU dispatch dashboard](docs/images/bmu_dispatch.png)
-
-The bottom panel separates instructed **turn-up** (green, generate more) from
-**curtailment** (red, generate less) per BMU:
-
-![BMU dispatch — turn-up and curtailment](docs/images/bmu_dispatch_curtailment.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/dispatch-dark.png">
+  <img alt="Dispatch view for SGRWO: station output, output by unit and system operator actions" src="docs/images/web/dispatch-light.png">
+</picture>
 
 > [!NOTE]
-> The PN / Dispatched / B1610 series on the station-total panel still need
+> The PN / Dispatched / B1610 series on the station-total chart still need
 > work: the three are sourced from different streams (interpolated PN+BOALF
 > vs. half-hourly settlement actuals) and don't always reconcile cleanly,
 > especially around BOA acceptances and during B1610's ~5-working-day lag.
 > Treat them as a sanity check on each other, not as the same number.
 
-### BMU output heatmap
+### Output
 
-National generation by fuel type, with per-station load-factor heatmaps (output
-as a % of each station's MEL capacity) grouped by fuel — a quick read on which
-plants are running hard and which are idle.
+National generation by fuel, then a heatmap for each fuel type with one row per
+station, coloured by load factor (output as a share of the station's MEL
+capacity). It's a quick read on which plants are running hard and which are
+idle. Each section loads when you scroll to it. Clicking a station opens its
+Dispatch view for the same window.
 
-![BMU output heatmap dashboard](docs/images/bmu_heatmap.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/output-dark.png">
+  <img alt="Output view: national generation by fuel and a wind load-factor heatmap by station" src="docs/images/web/output-light.png">
+</picture>
 
-### BMU annual summary
+### Annual
 
-A year of daily output per station as a calendar heatmap, either in absolute
-MWh/day or — pictured — as a % of MEL capacity, alongside a map for selecting
-stations and fuel types.
+A calendar of daily energy for each metric (planned, dispatched, metered, SO
+turn-up and BOA curtailment) across the chosen window. Pick the fuel types and
+stations on the map or in the lists, then switch between MWh per day and the
+share of capacity.
 
-![BMU annual summary (% of MEL capacity) dashboard](docs/images/bmu_annual_summary_pct.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/annual-dark.png">
+  <img alt="Annual view: daily energy calendars for wind as a percentage of capacity" src="docs/images/web/annual-light.png">
+</picture>
 
-Backfill, then materialize, then open Grafana:
+### Constraints
+
+NESO's day-ahead flow forecast for each transmission boundary, against its
+limit. The shaded band is each day's minimum-to-maximum range, the blue line
+is the 24-hour average, and the red line is the limit.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/web/constraints-dark.png">
+  <img alt="Constraints view: small multiples of boundary flows against limits" src="docs/images/web/constraints-light.png">
+</picture>
+
+The original Grafana dashboards are still provisioned on
+<http://localhost:3000> so you can compare the two. They'll be removed once the
+web UI is signed off.
+
+Backfill, then materialize, then open the web UI:
 
 ```bash
 gb-grid-ingest backfill --from 2026-04-01 --to 2026-04-07
 gb-grid-ingest materialize-dispatch --from 2026-04-01 --to 2026-04-07
-xdg-open http://localhost:3000/d/bmu-dispatch
+xdg-open http://localhost:8080/dispatch
 ```
 
 ## Migrations
