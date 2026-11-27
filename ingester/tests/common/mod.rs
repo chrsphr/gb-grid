@@ -9,6 +9,9 @@
 //! All helpers are **skip-safe**: if `GB_GRID_DATABASE_URL` is unset (e.g. a
 //! plain `cargo test` outside `nix develop`) the DB-backed tests return `None`
 //! and the test body returns early instead of failing.
+// Each test binary compiles its own copy of this module and uses only part of
+// it, so unused helpers in any one binary are expected.
+#![allow(dead_code)]
 
 use std::path::Path;
 use std::sync::OnceLock;
@@ -122,7 +125,6 @@ pub fn config() -> Option<Config> {
 
 /// A connection to the scratch database, or `None` to skip DB tests.
 pub async fn connect() -> Option<Client> {
-    let url = url()?;
     gb_grid_ingest::db::connect(&config()?).await.ok()
 }
 
