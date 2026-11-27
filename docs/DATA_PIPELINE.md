@@ -67,6 +67,14 @@ hourly tick, so the rolling overlap holds at the default.
 
 Historical loads use `gb-grid backfill --from --to [--dataset …]`.
 
+**Rust ingester.** The ingest + materialize layer is also shipped as a
+standalone Rust binary (`ingester/`, `gb-grid-ingest`), a drop-in for the
+Python `run`/`backfill`/`materialize-*`/`refresh-*`/`status` commands with the
+same windows, chunk sizes, retry policy, watermark/last-write-wins semantics and
+(verified) byte-identical output — see `bench/rs_vs_py/golden_materialize.sh`
+and `bench/RESULTS.md`. It cuts materialize CPU ~15–18× and wall-clock ~3×;
+Python `gb-grid migrate` remains the migration path (0004 is a Python step).
+
 **Ingest performance.** Windows within one dataset are fetched
 `GB_GRID_FETCH_CONCURRENCY` at a time (default 4) so HTTP latency overlaps
 rather than accumulating; writes stay serial and in window order, preserving

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 from gb_grid.ingest.constraints import CSV_URL, _parse_ts, ingest_constraints
 
 CSV = (
@@ -53,6 +55,35 @@ def test_rows_at_or_below_watermark_are_skipped(httpx_mock, db):
     # and here nothing is newer.
     httpx_mock.add_response(url=CSV_URL, text=CSV)
     assert ingest_constraints(db) == 0
+
+
+def test_current_header_and_iso_t_timestamps(httpx_mock, db):
+    """The header and timestamp format NESO publishes as of Nov 2026."""
+    httpx_mock.add_response(
+        url=CSV_URL,
+        text=(
+            "﻿Constraint Group,Date_ Time GMT_BST,Limit_MW,Flow_MW\r\n"
+            "SCOTEX,2026-06-10T09:30:00,5500,6118\r\n"
+            "SCOTEX,2026-01-14T12:00:00,5400,\r\n"
+        ),
+    )
+    assert ingest_constraints(db) == 2
+    with db.cursor() as cur:
+        cur.execute("SELECT constraint_group, ts, limit_mw, flow_mw FROM constraints ORDER BY ts")
+        rows = cur.fetchall()
+    assert rows == [
+        ("SCOTEX", datetime(2026, 1, 14, 12, 0), 5400.0, None),
+        ("SCOTEX", datetime(2026, 6, 10, 8, 30), 5500.0, 6118.0),
+    ]
+
+
+def test_missing_column_is_an_error(httpx_mock, db):
+    """A renamed column must fail loudly rather than skip every row."""
+    httpx_mock.add_response(
+        url=CSV_URL, text="Constraint Group,When,Limit_MW,Flow_MW\nSCOTEX,2026-06-10T09:30:00,1,2\n"
+    )
+    with pytest.raises(ValueError, match="Date_ Time GMT_BST"):
+        ingest_constraints(db)
 
 
 def test_parse_ts_converts_bst_to_utc():

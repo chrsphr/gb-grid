@@ -134,3 +134,132 @@ fetched a batch of N, then wrote it with the pool idle, and landed at ~9.4s
 batch overlaps the two phases and recovers the rest. Datasets whose payloads
 dominate (b1610) or any deployment with higher API latency should gain more;
 `GB_GRID_FETCH_CONCURRENCY` tunes it.
+
+---
+
+# Rust ingester — golden equivalence + CPU
+
+The ingest + materialize pipelines are ported to a standalone Rust binary
+(`ingester/`, built as `gb-grid-ingest`). Equivalence is checked by running both
+implementations over the **same real data** in two scratch databases and diffing
+the resulting `bmu_dispatch` table (`bench/rs_vs_py/golden_materialize.sh`).
+Timings via bash `time` (real/user/sys); Python materialize needs
+`LD_LIBRARY_PATH` for the venv's numpy (NixOS), which the script prepends.
+
+## Materialize (`materialize-dispatch`, 4 workers)
+
+Real BMRS data sliced from the dev DB (PN/BOALF/MELS/B1610) into both scratch
+DBs, then `materialize_dispatch` run by each implementation. 5-min grid, every
+active BMU.
+
+| Window | Rows | Python wall | Rust wall | Python user | Rust user |
+|---|--:|--:|--:|--:|--:|
+| 1 day (2026-05-01) | 702,146 | 37.1s | 13.0s (**2.9×**) | 81.5s | 4.5s (**18×**) |
+| 3 days (05-01..05-03) | 2,109,602 | 96.8s | 33.8s (**2.9×**) | 194.0s | 12.9s (**15×**) |
+
+**Output is byte-identical** between the two implementations on both windows
+(2.1M rows diffed clean; only the *sign of zero* in `so_curtailment_mw`
+differs — Python stores `-0.0` (numpy clip on a signed zero), Rust `+0.0`, which
+are numerically identical and ignored by the comparison).
+
+**Takeaway.** Rust cuts materialize CPU ~15–18× and wall-clock ~2.9×. The
+Python CPU number exceeds wall-clock because the process pool burns 4 cores;
+Rust's interp is a ~25-line sweep over sorted segments instead of numpy
+masked-stamps fanned across a pool, so even at 4 workers it uses a fraction of
+one core. The CPU floor (the DB write) is unchanged — both write the same rows
+to the same Postgres.
+
+## CLI startup (per-invocation fixed cost)
+
+| Command | Python wall/user | Rust wall/user |
+|---|--:|--:|
+| `status` (imports pandas) | 0.60s / 0.42s | 0.17s / 0.004s |
+
+Rust startup is ~4× faster wall and ~100× less CPU — the pandas/import cost is
+gone entirely. For the always-on scheduler the per-tick saving is the
+materialize win above; for one-off CLI invocations (backfill chunks, `status`)
+the startup saving applies every time.
+
+## How to reproduce
+
+```bash
+# in nix develop (dev Postgres up, GB_GRID_DATABASE_URL exported)
+cargo build --release        # in ingester/
+bash bench/rs_vs_py/golden_materialize.sh --from 2026-05-01 --to 2026-05-03 --workers 4
+```
+
+The script creates per-process scratch DBs (`gb_grid_golden_py_<pid>` /
+`gb_grid_golden_rs_<pid>`), migrates both via the Python `gb-grid migrate`,
+copies the real window slice, runs both `materialize-dispatch`, diffs the
+`bmu_dispatch` output, and prints the timing table. It exits non-zero if the
+tables differ.
+
+## Full pipeline, winter + clock changes (Nov 2026)
+
+`bench/rs_vs_py/golden_pipeline.sh` runs both implementations end to end
+against the **live** Elexon API, each into its own scratch DB: `backfill` (all
+datasets), then `materialize-dispatch`, then `materialize-dispatch-daily`. It
+diffs every ingested table, the watermarks, `bmu_dispatch`,
+`bmu_dispatch_daily` and every continuous aggregate.
+`golden_constraints.sh` does the same for `refresh-constraints` over the full
+NESO CSV (Jan 2023 onward, eight clock changes).
+
+| Window | Local day lengths | `bmu_dispatch` rows | Ingest + dispatch | Aggregates |
+|---|---|--:|---|---|
+| 2026-01-13..14 (GMT) | 24, 24 h | 1,374,336 | identical | ≤1e-12 |
+| 2025-10-25..27 (fall back) | 24, **25**, 24 h | 1,973,808 | identical | ≤1e-12 |
+| 2026-03-28..30 (spring fwd) | 24, **23**, 24 h | 2,096,928 | identical | ≤1e-12 |
+| 2026-10-24..26 (fall back) | 24, **25**, 24 h | 2,244,672 | identical | ≤1e-12 |
+| constraints, full CSV | 8 transitions | 776,108 | identical | n/a |
+
+Every settlement-date dataset has 46 periods on the spring day and 50 on the
+fall-back days. Every BMU has ≤288 five-minute points per UTC day (no doubled
+hour). **Aggregates differ only in float summation order.** A CAGG averages
+rows in the table's physical order, and the two DBs store identical rows in
+different orders (worker-completion order). Recomputing with `avg(x ORDER BY
+ts)` gives identical values in both DBs. The largest relative difference seen
+was 4.6e-16. `bmu_dispatch_daily` is built from a CAGG, so the script applies
+the same 1e-12 tolerance to it. Base tables must match exactly.
+
+Materialize: Rust 2.9–3.1× faster wall-clock, 23–30× less CPU (e.g. 3 days:
+48.9s / 92.0s user → 16.0s / 3.1s). Backfill takes about the same wall-clock
+in both (it waits on the API) and Rust uses about 30% less CPU.
+
+### Bugs this found
+
+In the Rust port (fixed, with regression tests):
+
+- **JSON float rounding.** serde_json's default parser is not correctly
+  rounded: `122.79999999999999` came out as `122.8`, 1 ULP from Python's value
+  (`system_prices`). Fixed by enabling the `float_roundtrip` feature.
+- **Constraints timestamps without seconds.** 84,575 rows of the live CSV
+  (`2023-10-28T00:00`) were dropped, because Rust only accepted `%H:%M:%S`.
+  It now accepts every form `fromisoformat` does.
+
+Upstream API changes (fixed in both implementations; prod is broken on both
+until it runs the fixed ingester):
+
+- **Elexon B1610/stream** now returns 400 for `from`/`to`. It needs
+  `settlementDateFrom`/`To` plus `settlementPeriodFrom=1`/`To=50`. Without the
+  period bounds it returns period 1 only. 50 covers the long fall-back day.
+- **NESO constraints CSV** renamed its columns to `Date_ Time GMT_BST`,
+  `Limit_MW` and `Flow_MW`, with ISO `T` timestamps. Both parsers skipped every
+  row and reported success with 0 rows. A missing column is now a hard error.
+
+Pre-existing in the shared SQL/semantics, same in both (not fixed):
+
+- B1610 sub-daily time axis (`b1610_series`, heatmap panels) uses
+  `(date + (sp-1)*30min) AT TIME ZONE 'Europe/London'`. On transition days that
+  misplaces 42 of 46 (spring) or 48 of 50 (autumn) periods by an hour, and
+  collides two half-hours. The fix is to anchor at local midnight:
+  `((date::timestamp AT TIME ZONE 'Europe/London') + (sp-1)*30min) AT TIME ZONE 'UTC'`.
+- Constraints on fall-back days: the CSV lists 01:00 and 01:30 twice (BST,
+  then GMT). Both parsers resolve each copy to the BST instant (fold=0), and
+  last-write-wins keeps the GMT values there. Each group loses two half-hours,
+  01:00–02:00 UTC stays empty, and two half-hours carry GMT-time values. The
+  fix is to resolve the second copy of a repeated wall-clock time as fold=1.
+
+```bash
+bash bench/rs_vs_py/golden_pipeline.sh --from 2025-10-25 --to 2025-10-27   # [--keep]
+bash bench/rs_vs_py/golden_constraints.sh                                  # [--keep]
+```

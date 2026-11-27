@@ -63,16 +63,18 @@ def fetch_b1610(
 ) -> list[dict[str, Any]]:
     """Per-BMU actual generation, half-hourly settlement periods.
 
-    The API's ``from``/``to`` are interpreted as instants — passing a bare date
-    only returns settlement period 1. Always send the full-day datetime span.
+    Filtered by settlement date (the endpoint stopped accepting ``from``/``to``
+    in Nov 2026). The range runs from period 1 of ``start`` to period 50 of
+    ``end``. Without the period bounds, ``settlementDateTo`` only reaches period
+    1 of the end date. 50 covers the long fall-back day.
     """
-    start_dt = datetime.combine(start, datetime.min.time())
-    end_dt = datetime.combine(end, datetime.max.time().replace(microsecond=0))
     payload = client.get(
         "/datasets/B1610/stream",
         params={
-            "from": _iso(start_dt),
-            "to": _iso(end_dt),
+            "settlementDateFrom": start.isoformat(),
+            "settlementDateTo": end.isoformat(),
+            "settlementPeriodFrom": 1,
+            "settlementPeriodTo": 50,
             "format": "json",
         },
     )
